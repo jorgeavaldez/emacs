@@ -5,6 +5,16 @@
 * Intro
 This is a minimal scaffold. Keep it simple, readable, and easy to extend.
 
+* Formatting this =config.org= (manual, no automation yet)
+This is the safest literate workflow for formatting Lisp in Org source blocks:
+- In an Org src block, run =M-x org-edit-special= (key: =C-c '=).
+  - This opens the block in a dedicated Emacs Lisp editing buffer.
+- In that edit buffer, format indentation with =M-x indent-region= (key: =C-M-\=).
+  - Use =M-x mark-whole-buffer= first if you want to indent the entire block.
+- Return to =config.org= with =M-x org-edit-src-exit= (key: =C-c '=).
+
+This keeps formatting focused on code blocks and avoids accidental edits to surrounding Org text.
+
 * 🚨 NEOVIM -> EMACS SURVIVAL CHEATSHEET 🚨
 ** Key notation
 - =C-= means Ctrl
@@ -87,6 +97,15 @@ This is a minimal scaffold. Keep it simple, readable, and easy to extend.
 - =TAB= on a heading :: cycle that subtree folded/children/all
 - =S-TAB= :: cycle visibility for whole Org buffer
 - =M-x org-cycle= / =M-x org-shifttab= :: command equivalents
+
+** Format this literate config (Org + Lisp blocks)
+- Open current src block in dedicated edit buffer:
+  - key: =C-c '=, command: =M-x org-edit-special=
+- Reindent code in that edit buffer:
+  - key: =C-M-\=, command: =M-x indent-region=
+  - useful helper: =M-x mark-whole-buffer= before =indent-region=
+- Return from src edit buffer to Org:
+  - key: =C-c '=, command: =M-x org-edit-src-exit=
 
 ** Save / quit Emacs
 - =C-x C-s= :: save current buffer
