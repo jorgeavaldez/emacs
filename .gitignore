@@ -1,0 +1,29 @@
+# Emacs byte-compiled / native-compiled artifacts
+*.elc
+*.eln
+eln-cache/
+
+# Literate generated output (source of truth is config.org)
+config.el
+
+# Emacs Customize UI output
+custom.el
+
+# Emacs runtime/cache state
+auto-save-list/
+tramp
+url/
+project-list
+bookmarks
+recentf
+savehist
+save-place
+network-security.data
+
+# Lock/backup/autosave files
+*~
+.#*
+\#*\#
+
+# macOS
+.DS_Store

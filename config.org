@@ -1,0 +1,62 @@
+#+title: Jorge's Literate Emacs Config
+#+startup: overview
+#+property: header-args:emacs-lisp :tangle config.el
+
+* Intro
+This is a minimal scaffold. Keep it simple, readable, and easy to extend.
+
+* Hello world + startup basics
+#+begin_src emacs-lisp
+;; Keep Customize UI output out of init.el.
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(when (file-exists-p custom-file)
+  (load custom-file nil 'nomessage))
+
+(setq inhibit-startup-screen t
+      initial-scratch-message nil
+      ring-bell-function 'ignore)
+
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (message "hello world from config.org")))
+#+end_src
+
+* UI defaults
+#+begin_src emacs-lisp
+;; Match Neovim GUI font preference when available.
+(let ((preferred-font "JetBrains Mono"))
+  (when (display-graphic-p)
+    (if (find-font (font-spec :name preferred-font))
+        (set-face-attribute 'default nil :font preferred-font :height 140)
+      (message "Font not found: %s (keeping default font)" preferred-font))))
+
+;; Keep UI minimal.
+(when (fboundp 'menu-bar-mode) (menu-bar-mode -1))
+(when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
+(when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+
+;; Built-in dark theme.
+(load-theme 'modus-vivendi t)
+#+end_src
+
+* Editing basics (Neovim-inspired)
+#+begin_src emacs-lisp
+;; Option A: default to tabs, but let major modes override when needed.
+(setq-default indent-tabs-mode t
+              tab-width 4)
+(setq standard-indent 4)
+
+;; Relative line numbers.
+(setq display-line-numbers-type 'relative)
+(global-display-line-numbers-mode 1)
+
+;; Clipboard behavior.
+(setq select-enable-clipboard t
+      select-enable-primary t
+      save-interprogram-paste-before-kill t)
+
+;; Split behavior similar to splitright/splitbelow defaults.
+(setq split-width-threshold 160
+      split-height-threshold nil
+      window-combination-resize t)
+#+end_src

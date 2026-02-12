@@ -1,0 +1,26 @@
+#+title: Jorge's Emacs Config
+
+A bespoke, from-scratch, literate Emacs configuration.
+
+* Goals
+- Keep everything understandable.
+- Stay close to existing Neovim workflow where it helps.
+- Grow incrementally from a minimal baseline.
+
+* Structure
+- =init.el=: tiny bootstrap file.
+- =config.org=: source of truth (literate config with explanations + code).
+- =config.el=: generated from =config.org= (ignored in git).
+
+* How it works
+On startup, =init.el= loads =config.org= via Org Babel:
+1. Tangle Emacs Lisp blocks into =config.el=
+2. Load =config.el=
+
+* Quick start
+- Open Emacs normally (with this directory as your config path/symlinked =~/.emacs.d=).
+- Edit =config.org= for all real changes.
+- Restart Emacs (or reload) to apply.
+
+* Notes
+Do not hand-edit =config.el=; it is generated output.
