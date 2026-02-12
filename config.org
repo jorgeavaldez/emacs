@@ -251,8 +251,13 @@ Why this setup:
     ;; i don't want this to also delete the buffer, in emacs i'm used to them just living forever anyways
     ;; evil has something built in but then it's evil specific
     (interactive)
-    (save-buffer)
-    (delete-window))
+
+    ;; only try to save if this buffer visits a file
+    (when (and (buffer-file-name) (buffer-modified-p))
+  	(save-buffer))
+    (if (one-window-p)
+  	  (bury-buffer)
+    (delete-window)))
 
   ;; =#'foo= means _the function named foo
   (define-key jorge/leader-map (kbd "w q") #'jorge/save-and-quit)
