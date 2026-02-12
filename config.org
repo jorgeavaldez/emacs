@@ -5,6 +5,92 @@
 * Intro
 This is a minimal scaffold. Keep it simple, readable, and easy to extend.
 
+* 🚨 NEOVIM -> EMACS SURVIVAL CHEATSHEET 🚨
+** Key notation
+- =C-= means Ctrl
+- =M-= means Meta (usually Alt/Option, or press =Esc= then key)
+
+** Get unstuck / quit prompts
+- =C-g= :: cancel current command (most important panic key)
+- =Esc Esc Esc= :: broad "get me out" escape
+- =q= :: quit many special/help buffers
+
+** Discover keybindings (current context)
+- =C-h m= :: show bindings/docs for current major/minor modes
+- =C-h b= :: show all active keybindings right now
+- =C-h k= then key :: explain what that key does
+- =M-x where-is RET <command>= :: find keybinding for a command
+
+** Movement
+- =C-f / C-b= :: right / left
+- =C-n / C-p= :: down / up
+- =C-a / C-e= :: beginning / end of line
+- =M-f / M-b= :: forward / backward word
+- =M-<= / =M->= :: top / bottom of buffer
+- =C-v / M-v= :: page down / page up
+
+** Vim-like bridges configured here
+- =C-d= :: half-page down
+- =C-u= :: half-page up
+- =C-o= :: jump back (xref -> mark ring fallback)
+
+** Window/buffer basics
+- =C-x o= :: move to other window
+- =C-x 2= / =C-x 3= :: split below / split right
+- =C-x 0= :: close current window
+- =C-x 1= :: keep only current window
+- =C-x b= :: switch buffer
+- =C-x k= :: kill buffer
+
+** Open files by path
+- =C-x C-f= :: open file by path (=find-file=)
+- Type absolute path (e.g. =~/.config/emacs/config.org=) or relative path, then =RET=
+- Press =TAB= for path completion while typing
+- =M-p / M-n= :: previous/next path history in minibuffer
+- =C-x C-v= :: visit a different file from current buffer
+
+** Search (Vim =/= style equivalent)
+- =C-s= :: incremental forward search (closest built-in to Vim =/=)
+- =C-r= :: incremental backward search
+- While searching: =C-s= next match, =C-r= previous match
+- =RET= :: finish search at current match
+- =C-g= :: cancel search and jump back to search start
+- =M-e= :: edit search string in minibuffer
+
+** Dired (file manager)
+- =C-x d= :: open Dired prompt
+- Enter a directory path then =RET= (e.g. =~/.config/emacs= or =.=)
+- In Dired:
+  - =RET= open file/dir
+  - =^= go to parent directory
+  - =g= refresh listing
+
+** Reload file/config
+- =M-x revert-buffer RET= :: reload current file from disk (after external changes)
+- In Dired, =g= refreshes the listing
+- Reload this literate config:
+  - =M-: (org-babel-load-file (expand-file-name "config.org" user-emacs-directory)) RET=
+
+** Undo / redo
+- =C-/= :: undo (also =C-_= or =C-x u=)
+- =M-x undo-redo= :: redo (Emacs 28+)
+
+** Org folding (headings)
+- =TAB= on a heading :: cycle that subtree folded/children/all
+- =S-TAB= :: cycle visibility for whole Org buffer
+- =M-x org-cycle= / =M-x org-shifttab= :: command equivalents
+
+** Save / quit Emacs
+- =C-x C-s= :: save current buffer
+- =C-x s= :: save modified buffers
+- =C-x C-c= :: quit Emacs
+
+** Evaluate Lisp quickly
+- =C-x b *scratch* RET= :: open scratch buffer
+- =C-j= :: eval previous sexp and insert result
+- =C-x C-e= :: eval sexp before point (minibuffer result)
+- =M-x ielm= :: interactive Emacs Lisp REPL
+
 * Hello world + startup basics
 #+begin_src emacs-lisp
 ;; Keep Customize UI output out of init.el.
@@ -59,4 +145,41 @@ This is a minimal scaffold. Keep it simple, readable, and easy to extend.
 (setq split-width-threshold 160
       split-height-threshold nil
       window-combination-resize t)
+#+end_src
+
+* Vim-like navigation aliases (temporary bridge)
+#+begin_src emacs-lisp
+(defun jorge/scroll-half-page-down ()
+  "Scroll down by roughly half a window (Vim-like C-d)."
+  (interactive)
+  (scroll-up-command (max 1 (/ (window-body-height) 2))))
+
+(defun jorge/scroll-half-page-up ()
+  "Scroll up by roughly half a window (Vim-like C-u)."
+  (interactive)
+  (scroll-down-command (max 1 (/ (window-body-height) 2))))
+
+(defun jorge/jump-back ()
+  "Jump back, preferring xref stack, then local/global mark rings.
+Roughly mirrors Vim's C-o behavior for common workflows."
+  (interactive)
+  (or (condition-case nil
+          (progn (xref-go-back) t)
+        (error nil))
+      (condition-case nil
+          (progn (pop-to-mark-command) t)
+        (error nil))
+      (condition-case nil
+          (progn (pop-global-mark) t)
+        (error nil))
+      (user-error "No jump-back location available")))
+
+;; Vim-style motion keys.
+(global-set-key (kbd "C-d") #'jorge/scroll-half-page-down)
+(global-set-key (kbd "C-u") #'jorge/scroll-half-page-up)
+(global-set-key (kbd "C-o") #'jorge/jump-back)
+
+;; Keep original Emacs commands available after remapping.
+(global-set-key (kbd "C-c d") #'delete-char)
+(global-set-key (kbd "C-c u") #'universal-argument)
 #+end_src
