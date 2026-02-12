@@ -10,12 +10,24 @@ This is a minimal scaffold. Keep it simple, readable, and easy to extend.
 - =C-= means Ctrl
 - =M-= means Meta (usually Alt/Option, or press =Esc= then key)
 
+** Leader-first essentials (new default)
+- =SPC SPC= :: command palette (=M-x=)
+- =SPC f f= :: open file
+- =SPC b b= :: switch buffer (Consult)
+- =SPC /= :: project grep (ripgrep)
+- =SPC s l= :: search in current buffer
+- =SPC s i= :: jump to symbol (imenu)
+- =SPC s o= :: jump to outline heading
+- =SPC ?= :: show available leader bindings
+
 ** Get unstuck / quit prompts
 - =C-g= :: cancel current command (most important panic key)
 - =Esc Esc Esc= :: broad "get me out" escape
 - =q= :: quit many special/help buffers
 
 ** Discover keybindings (current context)
+- =SPC= then pause :: show which-key popup for leader bindings
+- =SPC ?= :: force-open top-level leader help
 - =C-h m= :: show bindings/docs for current major/minor modes
 - =C-h b= :: show all active keybindings right now
 - =C-h k= then key :: explain what that key does
@@ -28,11 +40,7 @@ This is a minimal scaffold. Keep it simple, readable, and easy to extend.
 - =M-f / M-b= :: forward / backward word
 - =M-<= / =M->= :: top / bottom of buffer
 - =C-v / M-v= :: page down / page up
-
-** Vim-like bridges configured here
-- =C-d= :: half-page down
-- =C-u= :: half-page up
-- =C-o= :: jump back (xref -> mark ring fallback)
+- In Evil normal state: =C-d= and =C-u= already do Vim-style half-page scrolling
 
 ** Window/buffer basics
 - =C-x o= :: move to other window
@@ -107,6 +115,198 @@ This is a minimal scaffold. Keep it simple, readable, and easy to extend.
             (message "hello world from config.org")))
 #+end_src
 
+* Phase context (self-contained notes)
+This mirrors your migration plan so this file is understandable on its own.
+
+- *Tier 1* (do now): daily muscle memory and core coding loop
+  - modal editing, leader keys, key discovery
+  - find/search/navigation
+- *Tier 2* (next): weekly conveniences (extra workflow helpers, more mappings)
+- *Tier 3* (later): optional/rare mappings and polish
+
+In this file, the new sections below implement Tier 1 only.
+
+* Package bootstrap (built-in =package.el= + =use-package=)
+What this does:
+- enables Emacs package repositories
+- ensures =use-package= exists
+- makes package declarations consistent and readable
+
+Why:
+- this is the simplest "official Emacs" path while learning
+- every package below is declared in one place with =use-package=
+
+Note on local files:
+- package downloads live in =elpa/= and cache/history files (e.g. =history=, =var/=)
+- those are machine-local and are ignored via =.gitignore=
+
+#+begin_src emacs-lisp
+(require 'package)
+
+;; Standard package sources.
+(setq package-archives
+      '(("gnu"    . "https://elpa.gnu.org/packages/")
+        ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+        ("melpa"  . "https://melpa.org/packages/")))
+
+(package-initialize)
+
+;; Install use-package once, then reuse it everywhere below.
+(unless (package-installed-p 'use-package)
+  (unless package-archive-contents
+    (package-refresh-contents))
+  (package-install 'use-package))
+
+(require 'use-package)
+
+;; Default: automatically install missing packages declared with use-package.
+(setq use-package-always-ensure t)
+#+end_src
+
+* Phase 1 / Step 1: key model (Evil + leader + which-key)
+What each package is for:
+- =evil=: Vim modal editing in Emacs (normal/insert/visual/etc.)
+- =evil-collection=: makes many built-in/package buffers feel Vim-consistent
+- =which-key=: shows available key completions after a prefix (great for learning)
+
+Why this setup:
+- preserve your Neovim muscle memory
+- keep a *small* Tier 1 map first (daily essentials only)
+- use Space as leader (Spacemacs-style), plus =SPC SPC= for command palette (=M-x=)
+
+#+begin_src emacs-lisp
+(use-package evil
+  :init
+  ;; Must be set before Evil loads.
+  (setq evil-want-integration t
+        evil-want-keybinding nil
+        evil-want-C-u-scroll t
+        evil-undo-system 'undo-redo)
+  :config
+  (evil-mode 1))
+
+(use-package evil-collection
+  :after evil
+  :config
+  (evil-collection-init))
+
+(use-package which-key
+  :defer 0
+  :config
+  (which-key-mode 1)
+  (setq which-key-idle-delay 0.35))
+
+(defvar jorge/leader-map (make-sparse-keymap)
+  "Leader keymap for Evil normal/visual/motion states.")
+
+(defun jorge/reload-literate-config ()
+  "Reload config.org."
+  (interactive)
+  (org-babel-load-file (expand-file-name "config.org" user-emacs-directory)))
+
+;; Non-modal fallback for leader mappings.
+(global-set-key (kbd "C-c SPC") jorge/leader-map)
+
+(with-eval-after-load 'evil
+  (define-key evil-normal-state-map (kbd "SPC") jorge/leader-map)
+  (define-key evil-visual-state-map (kbd "SPC") jorge/leader-map)
+  (define-key evil-motion-state-map (kbd "SPC") jorge/leader-map))
+
+;; Spacemacs-style command palette.
+(define-key jorge/leader-map (kbd "SPC") #'execute-extended-command)
+
+;; Tier 1 starter mappings (daily essentials only).
+(define-key jorge/leader-map (kbd "f f") #'find-file)
+(define-key jorge/leader-map (kbd "f s") #'save-buffer)
+(define-key jorge/leader-map (kbd "b d") #'kill-current-buffer)
+
+(define-key jorge/leader-map (kbd "w v") #'split-window-right)
+(define-key jorge/leader-map (kbd "w s") #'split-window-below)
+(define-key jorge/leader-map (kbd "w d") #'delete-window)
+(define-key jorge/leader-map (kbd "w o") #'other-window)
+
+(define-key jorge/leader-map (kbd "c r") #'jorge/reload-literate-config)
+
+(with-eval-after-load 'which-key
+  (define-key jorge/leader-map (kbd "?") #'which-key-show-top-level)
+  (which-key-add-key-based-replacements
+    "SPC b" "buffers"
+    "SPC c" "config"
+    "SPC f" "files"
+    "SPC p" "project"
+    "SPC s" "search/symbols"
+    "SPC w" "windows"
+    "SPC SPC" "M-x / command palette"
+    "SPC ?" "which-key help"))
+#+end_src
+
+* Phase 1 / Step 2: find/search/navigation (Vertico stack + Consult)
+Plain-English mental model:
+- minibuffer = the prompt area where Emacs asks you for things (files, commands, symbols)
+- this stack upgrades that area without changing core Emacs concepts
+
+What each package does:
+- =savehist=: remembers past minibuffer inputs (searches, commands, etc.)
+- =vertico=: vertical candidate UI in minibuffer
+- =orderless=: fuzzy-ish matching by typing space-separated parts
+- =marginalia=: extra annotations in candidate list (type, doc, file info)
+- =consult=: the actual high-value commands (search, buffer switch, symbol jump)
+
+Why this is useful:
+- faster finding/searching with less memorization
+- keeps everything text-first and keyboard-first
+- works cleanly with leader mappings
+
+#+begin_src emacs-lisp
+(use-package savehist
+  :init
+  (savehist-mode 1))
+
+(use-package vertico
+  :init
+  (vertico-mode 1)
+  :custom
+  (vertico-cycle t))
+
+(use-package orderless
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-defaults nil)
+  (completion-category-overrides '((file (styles partial-completion)))))
+
+(use-package marginalia
+  :after vertico
+  :init
+  (marginalia-mode 1))
+
+(defun jorge/consult-ripgrep-project ()
+  "Search text in project root (fallback: current directory)."
+  (interactive)
+  (let ((project (project-current nil)))
+    (if project
+        (consult-ripgrep (project-root project))
+      (consult-ripgrep default-directory))))
+
+(use-package consult
+  :config
+  ;; Better previews for registers and xref results.
+  (setq register-preview-delay 0.5
+        register-preview-function #'consult-register-format)
+  (advice-add #'register-preview :override #'consult-register-window)
+  (setq xref-show-xrefs-function #'consult-xref
+        xref-show-definitions-function #'consult-xref)
+
+  ;; Leader-first mappings (no extra modifier-key rebinding required).
+  (define-key jorge/leader-map (kbd "b b") #'consult-buffer)
+  (define-key jorge/leader-map (kbd "/") #'jorge/consult-ripgrep-project)
+  (define-key jorge/leader-map (kbd "p s") #'jorge/consult-ripgrep-project)
+  (define-key jorge/leader-map (kbd "s l") #'consult-line)
+  (define-key jorge/leader-map (kbd "s i") #'consult-imenu)
+  (define-key jorge/leader-map (kbd "s o") #'consult-outline))
+#+end_src
+
+For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
+
 * UI defaults
 #+begin_src emacs-lisp
 ;; Match Neovim GUI font preference when available.
@@ -147,39 +347,13 @@ This is a minimal scaffold. Keep it simple, readable, and easy to extend.
       window-combination-resize t)
 #+end_src
 
-* Vim-like navigation aliases (temporary bridge)
-#+begin_src emacs-lisp
-(defun jorge/scroll-half-page-down ()
-  "Scroll down by roughly half a window (Vim-like C-d)."
-  (interactive)
-  (scroll-up-command (max 1 (/ (window-body-height) 2))))
+* Transition cleanup
+The temporary global bridge bindings were removed now that Evil is active.
 
-(defun jorge/scroll-half-page-up ()
-  "Scroll up by roughly half a window (Vim-like C-u)."
-  (interactive)
-  (scroll-down-command (max 1 (/ (window-body-height) 2))))
+Why:
+- avoids conflicting behavior between global remaps and Evil state maps
+- reduces cognitive load for learning one consistent key model
 
-(defun jorge/jump-back ()
-  "Jump back, preferring xref stack, then local/global mark rings.
-Roughly mirrors Vim's C-o behavior for common workflows."
-  (interactive)
-  (or (condition-case nil
-          (progn (xref-go-back) t)
-        (error nil))
-      (condition-case nil
-          (progn (pop-to-mark-command) t)
-        (error nil))
-      (condition-case nil
-          (progn (pop-global-mark) t)
-        (error nil))
-      (user-error "No jump-back location available")))
-
-;; Vim-style motion keys.
-(global-set-key (kbd "C-d") #'jorge/scroll-half-page-down)
-(global-set-key (kbd "C-u") #'jorge/scroll-half-page-up)
-(global-set-key (kbd "C-o") #'jorge/jump-back)
-
-;; Keep original Emacs commands available after remapping.
-(global-set-key (kbd "C-c d") #'delete-char)
-(global-set-key (kbd "C-c u") #'universal-argument)
-#+end_src
+Current behavior to know:
+- in Evil normal state, use Vim-native motions (including =C-d= /=C-u= / =C-o=)
+- in minibuffer/Emacs state, default Emacs behavior remains intact

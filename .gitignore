@@ -11,13 +11,17 @@ custom.el
 
 # Emacs runtime/cache state
 auto-save-list/
+elpa/
+package-quickstart.el
 tramp
 url/
+var/
 project-list
 bookmarks
 recentf
 savehist
 save-place
+history
 network-security.data
 
 # Lock/backup/autosave files
