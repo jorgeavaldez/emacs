@@ -175,69 +175,113 @@ Why this setup:
 - use Space as leader (Spacemacs-style), plus =SPC SPC= for command palette (=M-x=)
 
 #+begin_src emacs-lisp
-(use-package evil
-  :init
-  ;; Must be set before Evil loads.
-  (setq evil-want-integration t
-        evil-want-keybinding nil
-        evil-want-C-u-scroll t
-        evil-undo-system 'undo-redo)
-  :config
-  (evil-mode 1))
+  (use-package evil
+    :init
+    ;; Must be set before Evil loads.
+    (setq evil-want-integration t
+          evil-want-keybinding nil
+          evil-want-C-u-scroll t
+          evil-undo-system 'undo-redo)
+    :config
+    (evil-mode 1))
 
-(use-package evil-collection
-  :after evil
-  :config
-  (evil-collection-init))
+  (use-package evil-collection
+    :after evil
+    :config
+    (evil-collection-init))
 
-(use-package which-key
-  :defer 0
-  :config
-  (which-key-mode 1)
-  (setq which-key-idle-delay 0.35))
+  (use-package which-key
+    :defer 0
+    :config
+    (which-key-mode 1)
+    (setq which-key-idle-delay 0.35))
 
-(defvar jorge/leader-map (make-sparse-keymap)
-  "Leader keymap for Evil normal/visual/motion states.")
+  (defvar jorge/leader-map (make-sparse-keymap)
+    "Leader keymap for Evil normal/visual/motion states.")
 
-(defun jorge/reload-literate-config ()
-  "Reload config.org."
-  (interactive)
-  (org-babel-load-file (expand-file-name "config.org" user-emacs-directory)))
+  (defun jorge/reload-literate-config ()
+    "Reload config.org."
+    (interactive)
+    (org-babel-load-file (expand-file-name "config.org" user-emacs-directory)))
 
-;; Non-modal fallback for leader mappings.
-(global-set-key (kbd "C-c SPC") jorge/leader-map)
+  ;; Non-modal fallback for leader mappings.
+  (global-set-key (kbd "C-c SPC") jorge/leader-map)
 
-(with-eval-after-load 'evil
-  (define-key evil-normal-state-map (kbd "SPC") jorge/leader-map)
-  (define-key evil-visual-state-map (kbd "SPC") jorge/leader-map)
-  (define-key evil-motion-state-map (kbd "SPC") jorge/leader-map))
+  (with-eval-after-load 'evil
+    (define-key evil-normal-state-map (kbd "SPC") jorge/leader-map)
+    (define-key evil-visual-state-map (kbd "SPC") jorge/leader-map)
+    (define-key evil-motion-state-map (kbd "SPC") jorge/leader-map))
 
-;; Spacemacs-style command palette.
-(define-key jorge/leader-map (kbd "SPC") #'execute-extended-command)
+  ;; we need to define spc to my leader-map in all modes
+  ;; so we define our own "global jorge mode" and redefine that shit everywhere
+  ;; idk if there's issues w/ just using all my map yet, i def wanted search and keybinds
+  ;; general.el will do this for me automagically later
+  ;; source: http://blog.lujun9972.win/emacs-document/blog/2019/03/14/evil-guide/
+  (defvar jorge-intercept-mode-map (make-sparse-keymap)
+    "higher precendence keymap")
 
-;; Tier 1 starter mappings (daily essentials only).
-(define-key jorge/leader-map (kbd "f f") #'find-file)
-(define-key jorge/leader-map (kbd "f s") #'save-buffer)
-(define-key jorge/leader-map (kbd "b d") #'kill-current-buffer)
+  (define-minor-mode jorge-intercept-mode
+    "global minor mode for higher precedence bindings"
+    :global t)
 
-(define-key jorge/leader-map (kbd "w v") #'split-window-right)
-(define-key jorge/leader-map (kbd "w s") #'split-window-below)
-(define-key jorge/leader-map (kbd "w d") #'delete-window)
-(define-key jorge/leader-map (kbd "w o") #'other-window)
+  ;; do it after evil-colleciton loads its own helpers
+  (with-eval-after-load 'evil
+    ;; the alternative is to do this for help-model only
+    (jorge-intercept-mode 1)
+    (dolist (state '(normal visual motion))
+      (let ((state-map (evil-get-auxiliary-keymap 
+                        jorge-intercept-mode-map state t t)))
+      ;; our state map intercepts on the state
+      (evil-make-intercept-map state-map state)
+      ;; now we bind our leader prefix in this map
+      (define-key state-map (kbd "SPC") jorge/leader-map))))
 
-(define-key jorge/leader-map (kbd "c r") #'jorge/reload-literate-config)
+  ;; Spacemacs-style command palette.
+  (define-key jorge/leader-map (kbd "SPC") #'execute-extended-command)
 
-(with-eval-after-load 'which-key
-  (define-key jorge/leader-map (kbd "?") #'which-key-show-top-level)
-  (which-key-add-key-based-replacements
-    "SPC b" "buffers"
-    "SPC c" "config"
-    "SPC f" "files"
-    "SPC p" "project"
-    "SPC s" "search/symbols"
-    "SPC w" "windows"
-    "SPC SPC" "M-x / command palette"
-    "SPC ?" "which-key help"))
+  ;; Tier 1 starter mappings (daily essentials only).
+  (define-key jorge/leader-map (kbd "p f") #'find-file)
+  (define-key jorge/leader-map (kbd "f s") #'save-buffer)
+  (define-key jorge/leader-map (kbd "b d") #'kill-current-buffer)
+
+  (define-key jorge/leader-map (kbd "w v") #'split-window-right)
+
+  (defun jorge/save-and-quit ()
+    ;; there's no default save and close split
+    ;; i don't want this to also delete the buffer, in emacs i'm used to them just living forever anyways
+    ;; evil has something built in but then it's evil specific
+    (interactive)
+    (save-buffer)
+    (delete-window))
+
+  ;; =#'foo= means _the function named foo
+  (define-key jorge/leader-map (kbd "w q") #'jorge/save-and-quit)
+  (define-key jorge/leader-map (kbd "w s") #'split-window-below)
+  (define-key jorge/leader-map (kbd "w o") #'other-window)
+  (define-key jorge/leader-map (kbd "w h") #'windmove-left)
+  (define-key jorge/leader-map (kbd "w j") #'windmove-down)
+  (define-key jorge/leader-map (kbd "w k") #'windmove-up)
+  (define-key jorge/leader-map (kbd "w l") #'windmove-right)
+
+  (define-key jorge/leader-map (kbd "c r") #'jorge/reload-literate-config)
+
+  ;; when we open a help page, it doesn't auto focus unless this is set
+  (setq help-window-select t)
+  (define-key jorge/leader-map (kbd "h o") #'describe-symbol)
+  (define-key jorge/leader-map (kbd "h o") #'describe-symbol)
+
+  (with-eval-after-load 'which-key
+    (define-key jorge/leader-map (kbd "?") #'which-key-show-top-level)
+    (which-key-add-key-based-replacements
+      "SPC b" "buffers"
+      "SPC c" "config"
+      "SPC f" "files"
+      "SPC h" "help"
+      "SPC p" "project"
+      "SPC s" "search/symbols"
+      "SPC w" "windows"
+      "SPC SPC" "M-x / command palette"
+      "SPC ?" "which-key help"))
 #+end_src
 
 * Phase 1 / Step 2: find/search/navigation (Vertico stack + Consult)
