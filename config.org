@@ -250,10 +250,10 @@ Why this setup:
     (dolist (state '(normal visual motion))
       (let ((state-map (evil-get-auxiliary-keymap 
                         jorge-intercept-mode-map state t t)))
-      ;; our state map intercepts on the state
-      (evil-make-intercept-map state-map state)
-      ;; now we bind our leader prefix in this map
-      (define-key state-map (kbd "SPC") jorge/leader-map))))
+        ;; our state map intercepts on the state
+        (evil-make-intercept-map state-map state)
+        ;; now we bind our leader prefix in this map
+        (define-key state-map (kbd "SPC") jorge/leader-map))))
 
   ;; Spacemacs-style command palette.
   (define-key jorge/leader-map (kbd "SPC") #'execute-extended-command)
@@ -263,7 +263,6 @@ Why this setup:
   (define-key jorge/leader-map (kbd "f s") #'save-buffer)
   (define-key jorge/leader-map (kbd "b d") #'kill-current-buffer)
 
-  (define-key jorge/leader-map (kbd "w v") #'split-window-right)
 
   (defun jorge/save-and-quit ()
     ;; there's no default save and close split
@@ -276,11 +275,20 @@ Why this setup:
   	(save-buffer))
     (if (one-window-p)
   	  (bury-buffer)
-    (delete-window)))
+  	(delete-window)))
+
+  (define-key jorge/leader-map (kbd "w v")
+  			(lambda ()
+  			  (interactive)
+  			  (select-window (split-window-right))))
+
+  (define-key jorge/leader-map (kbd "w s")
+  			(lambda ()
+  			  (interactive)
+  			  (select-window (split-window-below))))
 
   ;; =#'foo= means _the function named foo
   (define-key jorge/leader-map (kbd "w q") #'jorge/save-and-quit)
-  (define-key jorge/leader-map (kbd "w s") #'split-window-below)
   (define-key jorge/leader-map (kbd "w o") #'other-window)
   (define-key jorge/leader-map (kbd "w h") #'windmove-left)
   (define-key jorge/leader-map (kbd "w j") #'windmove-down)
