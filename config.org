@@ -324,9 +324,11 @@ Plain-English mental model:
 What each package does:
 - =savehist=: remembers past minibuffer inputs (searches, commands, etc.)
 - =vertico=: vertical candidate UI in minibuffer
+  - this is the display itself. there's ui extensions we can install to configure this.
 - =orderless=: fuzzy-ish matching by typing space-separated parts
 - =marginalia=: extra annotations in candidate list (type, doc, file info)
 - =consult=: the actual high-value commands (search, buffer switch, symbol jump)
+  - this provides the list contents and accepts the input to do so
 
 Why this is useful:
 - faster finding/searching with less memorization
@@ -334,51 +336,74 @@ Why this is useful:
 - works cleanly with leader mappings
 
 #+begin_src emacs-lisp
-(use-package savehist
-  :init
-  (savehist-mode 1))
+    (use-package savehist
+      :init
+      (savehist-mode 1))
 
-(use-package vertico
-  :init
-  (vertico-mode 1)
-  :custom
-  (vertico-cycle t))
+    (use-package vertico
+      :init
+      (vertico-mode 1)
+      :custom
+      (vertico-cycle t))
 
-(use-package orderless
-  :custom
-  (completion-styles '(orderless basic))
-  (completion-category-defaults nil)
-  (completion-category-overrides '((file (styles partial-completion)))))
+    ;; Configure directory extension.
+  (use-package vertico-directory
+    :after vertico
+    :ensure nil
+    ;; More convenient directory navigation commands
+    :bind (:map vertico-map
+                ("RET" . vertico-directory-enter)
+                ("DEL" . vertico-directory-delete-char)
+                ("M-DEL" . vertico-directory-delete-word))
 
-(use-package marginalia
-  :after vertico
-  :init
-  (marginalia-mode 1))
+    ;; Tidy shadowed file names
+    :hook (rfn-eshadow-update-overlay . vertico-directory-tidy))
 
-(defun jorge/consult-ripgrep-project ()
-  "Search text in project root (fallback: current directory)."
-  (interactive)
-  (let ((project (project-current nil)))
-    (if project
-        (consult-ripgrep (project-root project))
-      (consult-ripgrep default-directory))))
+    (use-package orderless
+      :custom
+      (completion-styles '(orderless basic))
+      (completion-category-defaults nil)
+      (completion-category-overrides '((file (styles partial-completion)))))
 
-(use-package consult
-  :config
-  ;; Better previews for registers and xref results.
-  (setq register-preview-delay 0.5
-        register-preview-function #'consult-register-format)
-  (advice-add #'register-preview :override #'consult-register-window)
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref)
+    (use-package marginalia
+      :after vertico
+      :init
+      (marginalia-mode 1))
 
-  ;; Leader-first mappings (no extra modifier-key rebinding required).
-  (define-key jorge/leader-map (kbd "b b") #'consult-buffer)
-  (define-key jorge/leader-map (kbd "/") #'jorge/consult-ripgrep-project)
-  (define-key jorge/leader-map (kbd "p s") #'jorge/consult-ripgrep-project)
-  (define-key jorge/leader-map (kbd "s l") #'consult-line)
-  (define-key jorge/leader-map (kbd "s i") #'consult-imenu)
-  (define-key jorge/leader-map (kbd "s o") #'consult-outline))
+    (defun jorge/consult-ripgrep-project ()
+      "Search text in project root (fallback: current directory)."
+      (interactive)
+      (let ((project (project-current nil)))
+        (if project
+            (consult-ripgrep (project-root project))
+          (consult-ripgrep default-directory))))
+
+    (use-package consult
+      :config
+      ;; Better previews for registers and xref results.
+      (setq register-preview-delay 0.5
+            register-preview-function #'consult-register-format)
+      (advice-add #'register-preview :override #'consult-register-window)
+      (setq xref-show-xrefs-function #'consult-xref
+            xref-show-definitions-function #'consult-xref)
+
+      ;; Start searching sooner while typing
+      (setq consult-async-min-input 1
+            consult-async-input-debounce 0.05
+            consult-async-input-throttle 0.02)
+
+      ;; Faster candidate preview for ripgrep
+      (consult-customize
+       consult-ripgrep
+       :preview-key '(:debounce 0.1 any))
+
+      ;; Leader-first mappings (no extra modifier-key rebinding required).
+      (define-key jorge/leader-map (kbd "b b") #'consult-buffer)
+      (define-key jorge/leader-map (kbd "/") #'jorge/consult-ripgrep-project)
+      (define-key jorge/leader-map (kbd "p s") #'jorge/consult-ripgrep-project)
+      (define-key jorge/leader-map (kbd "s l") #'consult-line)
+      (define-key jorge/leader-map (kbd "s i") #'consult-imenu)
+      (define-key jorge/leader-map (kbd "s o") #'consult-outline))
 #+end_src
 
 For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
