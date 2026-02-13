@@ -410,20 +410,24 @@ For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
 
 * UI defaults
 #+begin_src emacs-lisp
-;; Match Neovim GUI font preference when available.
-(let ((preferred-font "JetBrainsMono Nerd Font Mono"))
-  (when (display-graphic-p)
-    (if (find-font (font-spec :name preferred-font))
-        (set-face-attribute 'default nil :font preferred-font :height 140)
-      (message "Font not found: %s (keeping default font)" preferred-font))))
+  ;; Match Neovim GUI font preference when available.
+  (let ((preferred-font "JetBrainsMono Nerd Font Mono"))
+    (when (display-graphic-p)
+      (if (find-font (font-spec :name preferred-font))
+          (set-face-attribute 'default nil :font preferred-font :height 140)
+        (message "Font not found: %s (keeping default font)" preferred-font))))
 
-;; Keep UI minimal.
-(when (fboundp 'menu-bar-mode) (menu-bar-mode -1))
-(when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
-(when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+  ;; Keep UI minimal.
+  (when (fboundp 'menu-bar-mode) (menu-bar-mode -1))
+  (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
+  (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
 
-;; Built-in dark theme.
-(load-theme 'modus-vivendi t)
+  (use-package catppuccin-theme
+    :ensure t
+    :config
+    (setq catppuccin-flavor 'mocha)
+    (load-theme 'catppuccin t)
+    )
 #+end_src
 
 * Editing basics (Neovim-inspired)
