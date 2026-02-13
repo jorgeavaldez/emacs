@@ -455,7 +455,7 @@ For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
   (when (fboundp 'menu-bar-mode) (menu-bar-mode -1))
   (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
   (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
-  (add-to-list 'default-frame-alist '(undecorated . t))
+  ;; (add-to-list 'default-frame-alist '(undecorated . t))
   ;; (setq ns-auto-hide-menu-bar t)
   ;; (set-frame-position nil 0 -24)
 
@@ -517,4 +517,16 @@ This package should give us a more emacs-native use of everything.
     )
 
   (define-key jorge/leader-map (kbd "a i") #'pi)
+#+end_src
+
+* Markdown
+https://jblevins.org/projects/markdown-mode/
+i'm getting tired of not being able to read my clanker slop.
+#+begin_src emacs-lisp
+  (use-package markdown-mode
+    :ensure t
+    :mode ("README\\.md\\'" . gfm-mode)
+    :init (setq markdown-command "multimarkdown")
+    :bind (:map markdown-mode-map
+  			  ("C-c C-e" . markdown-do)))
 #+end_src
