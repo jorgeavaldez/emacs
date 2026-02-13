@@ -432,24 +432,27 @@ For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
 
 * Editing basics (Neovim-inspired)
 #+begin_src emacs-lisp
-;; Option A: default to tabs, but let major modes override when needed.
-(setq-default indent-tabs-mode t
-              tab-width 4)
-(setq standard-indent 4)
+  ;; Option A: default to tabs, but let major modes override when needed.
+  (setq-default indent-tabs-mode t
+                tab-width 4)
+  (setq standard-indent 4)
 
-;; Relative line numbers.
-(setq display-line-numbers-type 'relative)
-(global-display-line-numbers-mode 1)
+  ;; Relative line numbers.
+  (setq display-line-numbers-type 'relative)
+  (global-display-line-numbers-mode 1)
 
-;; Clipboard behavior.
-(setq select-enable-clipboard t
-      select-enable-primary t
-      save-interprogram-paste-before-kill t)
+  ;; Clipboard behavior.
+  (setq select-enable-clipboard t
+        select-enable-primary t
+        save-interprogram-paste-before-kill t)
 
-;; Split behavior similar to splitright/splitbelow defaults.
-(setq split-width-threshold 160
-      split-height-threshold nil
-      window-combination-resize t)
+  ;; Split behavior similar to splitright/splitbelow defaults.
+  (setq split-width-threshold 160
+        split-height-threshold nil
+        window-combination-resize t)
+
+  ;; auto close parens
+  (electric-pair-mode 1)
 #+end_src
 
 * Transition cleanup
