@@ -442,7 +442,15 @@ Why this is useful:
 
 For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
 
+i just learned embark gives me the ability to export search results into a persistent buffer. def necessary for me, i like to jump between the result and the active search.
+
+** TODO install embark
+** TODO set fuzzy search in orderless config
+this is called =flex= matching in their parlance. 
+mr cheeze bot has the thread on this
+
 * UI defaults
+** font
 #+begin_src emacs-lisp
   ;; Match Neovim GUI font preference when available.
   (let ((preferred-font "JetBrainsMono Nerd Font Mono"))
@@ -450,15 +458,33 @@ For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
       (if (find-font (font-spec :name preferred-font))
           (set-face-attribute 'default nil :font preferred-font :height 140)
         (message "Font not found: %s (keeping default font)" preferred-font))))
-
+#+end_src
+** remove the weird bars and stuff
+#+begin_src emacs-lisp
   ;; Keep UI minimal.
   (when (fboundp 'menu-bar-mode) (menu-bar-mode -1))
   (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
   (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+#+end_src
+** macos shit
+#+begin_src emacs-lisp
+  ;; this stuff removes the whole window frame, but stuff gets misaligned real weird?
+  ;; text gets clipped, it's not very nice
+  ;; i'm sure with enough nonsense i could fix it
+  ;; but tahoe is so bad that the corners get messed up too
+  ;; one of these even hides the apple logo button man it's nuts
   ;; (add-to-list 'default-frame-alist '(undecorated . t))
   ;; (setq ns-auto-hide-menu-bar t)
   ;; (set-frame-position nil 0 -24)
 
+  ;; fix the weird bottom gap?
+  (setq frame-resize-pixelwise t)
+  ;; stackoverflow recommendation, we need to call this more than once to truly maximize
+  (dotimes (n 3)
+    (toggle-frame-maximized))
+#+end_src
+** theme - catppuccin
+#+begin_src emacs-lisp
   (use-package catppuccin-theme
     :ensure t
     :config
@@ -530,3 +556,59 @@ i'm getting tired of not being able to read my clanker slop.
     :bind (:map markdown-mode-map
   			  ("C-c C-e" . markdown-do)))
 #+end_src
+
+* Integrated terminal
+the built in terminal is really shitty and doesn't support tuis very well.
+eat is an option. vterm is supposed to be the fastest.
+for now we're going w/ vterm.
+#+begin_src emacs-lisp
+  (use-package vterm
+    :ensure t)
+#+end_src
+great!
+https://github.com/akermu/emacs-libvterm?tab=readme-ov-file#shell-side-configuration-files
+the docs mention that it can integrate w/ my shell.
+i'm adding the following to ~/dots/.zshrc
+#+begin_src shell :tangle no
+  if [["$INSIDE_EMACS" = 'vterm' ]]; then
+      # integrate w/ emacs vterm
+      function vterm_printf() {
+          if [ -n "$TMUX" ] &&
+              { [ "${TERM%%-*}" = "tmux" ] ||
+                  [ "${TERM%%-*}" = "screen" ]; }; then
+              # Tell tmux to pass the escape sequences through
+              printf "\ePtmux;\e\e]%s\007\e\\" "$1"
+          elif [ "${TERM%%-*}" = "screen" ]; then
+              # GNU screen (screen, screen-256color, screen-256color-bce)
+              printf "\eP\e]%s\007\e\\" "$1"
+          else
+              printf "\e]%s\e\\" "$1"
+          fi
+      }
+
+      function vterm_cmd() {
+          local vterm_elisp
+          vterm_elisp=""
+          while [ $# -gt 0 ]; do
+              vterm_elisp="$vterm_elisp""$(printf '"%s" ' "$(printf "%s" "$1" | sed -e 's|\\|\\\\|g' -e 's|"|\\"|g')")"
+              shift
+          done
+          vterm_printf "51;E$vterm_elisp"
+      }
+
+      function vterm_prompt_end() {
+          vterm_printf "51;A$(whoami)@$(hostname):$(pwd)"
+      }
+      setopt PROMPT_SUBST
+      PROMPT=$PROMPT'%{$(vterm_prompt_end)%}'
+  fi
+#+end_src
+on my mac, this required cmake, and libtool
+i installed cmake w/ mise =mise use -g cmake@latest=
+=libtool= is in homebrew, =brew install libtool=
+** C-c
+=C-c C-c= sends escape, so i just basically have to mash it to get it to work properly in pi.
+** ESC
+=C-[= sends the ESC to vterm. otherwise it exists insert mode.
+=C-c C-z= toggles where escape gets sent to.
+that's =evil-collection-vterm-toggle-send-escape=
