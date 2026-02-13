@@ -182,6 +182,18 @@ Note on local files:
 (setq use-package-always-ensure t)
 #+end_src
 
+* Ensure env vars are set
+when we start gui emacs, it only inherits a minimal set of env vars.
+unfortunately, this means searching for binaries can fail.
+we can fix that using https://github.com/purcell/exec-path-from-shell
+#+begin_src emacs-lisp
+  (use-package exec-path-from-shell
+    :ensure t
+    :config
+    (when (memq window-system '(mac ns x))
+    (exec-path-from-shell-initialize))
+  )
+#+end_src
 * Phase 1 / Step 1: key model (Evil + leader + which-key)
 What each package is for:
 - =evil=: Vim modal editing in Emacs (normal/insert/visual/etc.)
@@ -334,7 +346,7 @@ Why this is useful:
 - faster finding/searching with less memorization
 - keeps everything text-first and keyboard-first
 - works cleanly with leader mappings
-
+  
 #+begin_src emacs-lisp
   (use-package savehist
     :init
@@ -443,6 +455,9 @@ For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
   (when (fboundp 'menu-bar-mode) (menu-bar-mode -1))
   (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
   (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+  (add-to-list 'default-frame-alist '(undecorated . t))
+  ;; (setq ns-auto-hide-menu-bar t)
+  ;; (set-frame-position nil 0 -24)
 
   (use-package catppuccin-theme
     :ensure t
@@ -487,3 +502,19 @@ Why:
 Current behavior to know:
 - in Evil normal state, use Vim-native motions (including =C-d= /=C-u= / =C-o=)
 - in minibuffer/Emacs state, default Emacs behavior remains intact
+
+* AI
+I integrated my neovim into pi very heavily.
+This package should give us a more emacs-native use of everything.
+
+#+begin_src emacs-lisp
+  (use-package pi-coding-agent
+    :ensure t
+    :init (defalias 'pi 'pi-coding-agent)
+    :custom
+    (pi-coding-agent-copy-raw-markdown t)            ; Keep raw markdown on copy (default: strip hidden markup)
+    (pi-coding-agent-input-markdown-highlighting t)  ; GFM syntax highlighting in input buffer
+    )
+
+  (define-key jorge/leader-map (kbd "a i") #'pi)
+#+end_src
