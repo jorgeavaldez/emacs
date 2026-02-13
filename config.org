@@ -259,8 +259,8 @@ Why this setup:
   (define-key jorge/leader-map (kbd "SPC") #'execute-extended-command)
 
   ;; Tier 1 starter mappings (daily essentials only).
-  (define-key jorge/leader-map (kbd "p f") #'find-file)
   (define-key jorge/leader-map (kbd "f s") #'save-buffer)
+  (define-key jorge/leader-map (kbd "f f") #'find-file)
   (define-key jorge/leader-map (kbd "b d") #'kill-current-buffer)
 
 
@@ -336,17 +336,17 @@ Why this is useful:
 - works cleanly with leader mappings
 
 #+begin_src emacs-lisp
-    (use-package savehist
-      :init
-      (savehist-mode 1))
+  (use-package savehist
+    :init
+    (savehist-mode 1))
 
-    (use-package vertico
-      :init
-      (vertico-mode 1)
-      :custom
-      (vertico-cycle t))
+  (use-package vertico
+    :init
+    (vertico-mode 1)
+    :custom
+    (vertico-cycle t))
 
-    ;; Configure directory extension.
+  ;; Configure directory extension.
   (use-package vertico-directory
     :after vertico
     :ensure nil
@@ -359,51 +359,73 @@ Why this is useful:
     ;; Tidy shadowed file names
     :hook (rfn-eshadow-update-overlay . vertico-directory-tidy))
 
-    (use-package orderless
-      :custom
-      (completion-styles '(orderless basic))
-      (completion-category-defaults nil)
-      (completion-category-overrides '((file (styles partial-completion)))))
+  (use-package orderless
+    :custom
+    (completion-styles '(orderless basic))
+    (completion-category-defaults nil)
+    (completion-category-overrides '((file (styles partial-completion)))))
 
-    (use-package marginalia
-      :after vertico
-      :init
-      (marginalia-mode 1))
+  (use-package marginalia
+    :after vertico
+    :init
+    (marginalia-mode 1))
+
+  (defun jorge/default-dir ()
+    "Resolve the project root, fallback to current directory)."
+    (if-let ((project (project-current nil)))
+          (project-root project)
+        default-directory))
 
     (defun jorge/consult-ripgrep-project ()
-      "Search text in project root (fallback: current directory)."
-      (interactive)
-      (let ((project (project-current nil)))
-        (if project
-            (consult-ripgrep (project-root project))
-          (consult-ripgrep default-directory))))
+  	"Search text in project root (fallback: current directory)."
+  	(interactive)
+  	(consult-ripgrep (jorge/default-dir)))
+
+    (defun jorge/consult-ripgrep-dir ()
+  	"Search text, scoped to provided directory, defaulting to project root (fallback: current directory)."
+  	(interactive)
+  	(consult-ripgrep (read-directory-name "Scope to: " (jorge/default-dir))))
+
+    (defun jorge/consult-fd-dir ()
+  	"Search for files, scoped to provided directory, defaulting to project root (fallback: current directory)."
+  	(interactive)
+  	(consult-fd (read-directory-name "Scope to: " (jorge/default-dir))))
 
     (use-package consult
-      :config
-      ;; Better previews for registers and xref results.
-      (setq register-preview-delay 0.5
+  	:config
+  	;; Better previews for registers and xref results.
+  	(setq register-preview-delay 0.5
             register-preview-function #'consult-register-format)
-      (advice-add #'register-preview :override #'consult-register-window)
-      (setq xref-show-xrefs-function #'consult-xref
+  	(advice-add #'register-preview :override #'consult-register-window)
+  	(setq xref-show-xrefs-function #'consult-xref
             xref-show-definitions-function #'consult-xref)
 
-      ;; Start searching sooner while typing
-      (setq consult-async-min-input 1
+  	;; Start searching sooner while typing
+  	(setq consult-async-min-input 1
             consult-async-input-debounce 0.05
             consult-async-input-throttle 0.02)
 
-      ;; Faster candidate preview for ripgrep
-      (consult-customize
-       consult-ripgrep
-       :preview-key '(:debounce 0.1 any))
+  	;; Faster candidate preview for ripgrep
+  	(consult-customize
+  	 consult-ripgrep
+  	 :preview-key '(:debounce 0.1 any))
 
-      ;; Leader-first mappings (no extra modifier-key rebinding required).
-      (define-key jorge/leader-map (kbd "b b") #'consult-buffer)
-      (define-key jorge/leader-map (kbd "/") #'jorge/consult-ripgrep-project)
-      (define-key jorge/leader-map (kbd "p s") #'jorge/consult-ripgrep-project)
-      (define-key jorge/leader-map (kbd "s l") #'consult-line)
-      (define-key jorge/leader-map (kbd "s i") #'consult-imenu)
-      (define-key jorge/leader-map (kbd "s o") #'consult-outline))
+  	(consult-customize
+  	 consult-fd
+  	 :preview-key '(:debounce 0.1 any))
+
+  	;; Leader-first mappings (no extra modifier-key rebinding required).
+  	(define-key jorge/leader-map (kbd "b b") #'consult-buffer)
+  	(define-key jorge/leader-map (kbd "/") #'jorge/consult-ripgrep-project)
+  	(define-key jorge/leader-map (kbd "s l") #'consult-line)
+  	(define-key jorge/leader-map (kbd "s i") #'consult-imenu)
+  	(define-key jorge/leader-map (kbd "s o") #'consult-outline)
+  	(define-key jorge/leader-map (kbd "p s") #'jorge/consult-ripgrep-project)
+  	(define-key jorge/leader-map (kbd "p S") #'jorge/consult-ripgrep-dir)
+  	(define-key jorge/leader-map (kbd "s s") #'jorge/consult-ripgrep-dir)
+  	(define-key jorge/leader-map (kbd "p f") #'consult-fd)
+  	(define-key jorge/leader-map (kbd "p F") #'jorge/consult-fd-dir)
+  	(define-key jorge/leader-map (kbd "s f") #'jorge/consult-fd-dir))
 #+end_src
 
 For now, =embark= is intentionally deferred to keep Phase 1 low-friction.
