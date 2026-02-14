@@ -628,8 +628,18 @@ https://github.com/sshaw/git-link
 
 * telegram client?!?!
 #+begin_src emacs-lisp
-  (use-package telega
-    :commands (telega)
-    :defer t)
+    (use-package telega
+      :commands (telega)
+      :defer t
+  	:config
+  	(setq telega-server-libs-prefix "/opt/homebrew/Cellar/tdlib/HEAD-6d50906")
+(telega-transient-keymaps-mode 1)
+
+  	:bind-keymap
+  	("C-c t" . telega-prefix-map)
+  )
 #+end_src
 i had to install tdlib ~brew install tdlib --head~
+** forum topic filtering
+we can chat in a group forum type, like our openclaw setup, and filter to send messages in a specific topic by runing ~C-c /~ then selecting topic.
+that's how i'm chatting to the emacs mistah cheeze and it's working well.
