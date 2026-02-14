@@ -426,8 +426,13 @@ Why this is useful:
   	 consult-fd
   	 :preview-key '(:debounce 0.1 any))
 
+  	;; we can type this in the consul buffer, then =h= to see help, or other keys to change the types we search through
+  	(setq consult-narrow-key "<")
+  	;; widen does the opposite
+  	(setq consult-widen-key ">")
+
   	;; Leader-first mappings (no extra modifier-key rebinding required).
-  	(define-key jorge/leader-map (kbd "b b") #'consult-buffer)
+  	(define-key jorge/leader-map (kbd "b b") #'consult-buffer) ;
   	(define-key jorge/leader-map (kbd "/") #'jorge/consult-ripgrep-project)
   	(define-key jorge/leader-map (kbd "s l") #'consult-line)
   	(define-key jorge/leader-map (kbd "s i") #'consult-imenu)
@@ -604,11 +609,26 @@ i'm adding the following to ~/dots/.zshrc
   fi
 #+end_src
 on my mac, this required cmake, and libtool
-i installed cmake w/ mise =mise use -g cmake@latest=
-=libtool= is in homebrew, =brew install libtool=
+i installed cmake w/ mise ~mise use -g cmake@latest~
+~libtool~ is in homebrew, ~brew install libtool~
 ** C-c
 =C-c C-c= sends escape, so i just basically have to mash it to get it to work properly in pi.
 ** ESC
 =C-[= sends the ESC to vterm. otherwise it exists insert mode.
 =C-c C-z= toggles where escape gets sent to.
 that's =evil-collection-vterm-toggle-send-escape=
+** C-u and evil mode
+https://www.reddit.com/r/emacs/comments/9j34bf/comment/e6oecd1/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+=C-u= is apparently the /universal argument/ that's widely used everywhere.
+
+* shortlist (or, install when i'm bored)
+** git-link
+https://github.com/sshaw/git-link
+
+* telegram client?!?!
+#+begin_src emacs-lisp
+  (use-package telega
+    :commands (telega)
+    :defer t)
+#+end_src
+i had to install tdlib ~brew install tdlib --head~
