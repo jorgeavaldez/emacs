@@ -132,6 +132,12 @@ This keeps formatting focused on code blocks and avoids accidental edits to surr
 (add-hook 'emacs-startup-hook
           (lambda ()
             (message "hello world from config.org")))
+
+;; Make yes-or-no questions shorter (y/n instead of typing "yes"/"no")
+(fset 'yes-or-no-p 'y-or-n-p)
+
+;; Keep backup files in a separate directory instead of cluttering your folders
+(setq backup-directory-alist '(("." . "~/.emacs.d/backups")))
 #+end_src
 
 * Phase context (self-contained notes)
