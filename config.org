@@ -2,9 +2,6 @@
 #+startup: overview
 #+property: header-args:emacs-lisp :tangle config.el
 
-* Intro
-This is a minimal scaffold. Keep it simple, readable, and easy to extend.
-
 * Formatting this =config.org= (manual, no automation yet)
 This is the safest literate workflow for formatting Lisp in Org source blocks:
 - In an Org src block, run =M-x org-edit-special= (key: =C-c '=).
@@ -22,12 +19,15 @@ This keeps formatting focused on code blocks and avoids accidental edits to surr
 
 ** Leader-first essentials (new default)
 - =SPC SPC= :: command palette (=M-x=)
-- =SPC f f= :: open file
+- =SPC f o= :: open file
+- =SPC f f= :: format file
 - =SPC b b= :: switch buffer (Consult)
 - =SPC /= :: project grep (ripgrep)
 - =SPC s l= :: search in current buffer
 - =SPC s i= :: jump to symbol (imenu)
 - =SPC s o= :: jump to outline heading
+- =SPC s d= :: diagnostics list (Consult)
+- =[d= /=]d= :: previous / next diagnostic
 - =SPC ?= :: show available leader bindings
 
 ** Get unstuck / quit prompts
@@ -120,36 +120,27 @@ This keeps formatting focused on code blocks and avoids accidental edits to surr
 
 * Hello world + startup basics
 #+begin_src emacs-lisp
-;; Keep Customize UI output out of init.el.
-(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
-(when (file-exists-p custom-file)
-  (load custom-file nil 'nomessage))
+  ;; Keep Customize UI output out of init.el.
+  (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+  (when (file-exists-p custom-file)
+    (load custom-file nil 'nomessage))
 
-(setq inhibit-startup-screen t
-      initial-scratch-message nil
-      ring-bell-function 'ignore)
+  (setq inhibit-startup-screen t
+        initial-scratch-message nil
+        ring-bell-function 'ignore)
 
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (message "hello world from config.org")))
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (message "hello world from config.org")))
 
-;; Make yes-or-no questions shorter (y/n instead of typing "yes"/"no")
-(fset 'yes-or-no-p 'y-or-n-p)
+  ;; Make yes-or-no questions shorter (y/n instead of typing "yes"/"no")
+  (fset 'yes-or-no-p 'y-or-n-p)
 
-;; Keep backup files in a separate directory instead of cluttering your folders
-(setq backup-directory-alist '(("." . "~/.emacs.d/backups")))
+  (global-auto-revert-mode 1)
+
+  ;; Keep backup files in a separate directory instead of cluttering your folders
+  (setq backup-directory-alist '(("." . "~/.emacs.d/backups")))
 #+end_src
-
-* Phase context (self-contained notes)
-This mirrors your migration plan so this file is understandable on its own.
-
-- *Tier 1* (do now): daily muscle memory and core coding loop
-  - modal editing, leader keys, key discovery
-  - find/search/navigation
-- *Tier 2* (next): weekly conveniences (extra workflow helpers, more mappings)
-- *Tier 3* (later): optional/rare mappings and polish
-
-In this file, the new sections below implement Tier 1 only.
 
 * Package bootstrap (built-in =package.el= + =use-package=)
 What this does:
@@ -200,7 +191,7 @@ we can fix that using https://github.com/purcell/exec-path-from-shell
     (exec-path-from-shell-initialize))
   )
 #+end_src
-* Phase 1 / Step 1: key model (Evil + leader + which-key)
+* Basic bindings and key model (Evil + leader + which-key)
 What each package is for:
 - =evil=: Vim modal editing in Emacs (normal/insert/visual/etc.)
 - =evil-collection=: makes many built-in/package buffers feel Vim-consistent
@@ -278,7 +269,7 @@ Why this setup:
 
   ;; Tier 1 starter mappings (daily essentials only).
   (define-key jorge/leader-map (kbd "f s") #'save-buffer)
-  (define-key jorge/leader-map (kbd "f f") #'find-file)
+  (define-key jorge/leader-map (kbd "f o") #'find-file)
   (define-key jorge/leader-map (kbd "b d") #'kill-current-buffer)
 
 
@@ -352,7 +343,7 @@ Why this setup:
       "SPC ?" "which-key help"))
 #+end_src
 
-* Phase 1 / Step 2: find/search/navigation (Vertico stack + Consult)
+* find/search/navigation (Vertico stack + Consult)
 Plain-English mental model:
 - minibuffer = the prompt area where Emacs asks you for things (files, commands, symbols)
 - this stack upgrades that area without changing core Emacs concepts
@@ -479,6 +470,8 @@ i just learned embark gives me the ability to export search results into a persi
 this is called =flex= matching in their parlance. 
 mr cheeze bot has the thread on this
 
+* LSP + completion + formatting + linting
+
 * UI defaults
 ** font
 #+begin_src emacs-lisp
@@ -525,7 +518,7 @@ mr cheeze bot has the thread on this
 
 * Editing basics (Neovim-inspired)
 #+begin_src emacs-lisp
-  ;; Option A: default to tabs, but let major modes override when needed.
+  ;; default to tabs, but let major modes override when needed.
   (setq-default indent-tabs-mode t
                 tab-width 4)
   (setq standard-indent 4)
@@ -547,17 +540,6 @@ mr cheeze bot has the thread on this
   ;; auto close parens
   (electric-pair-mode 1)
 #+end_src
-
-* Transition cleanup
-The temporary global bridge bindings were removed now that Evil is active.
-
-Why:
-- avoids conflicting behavior between global remaps and Evil state maps
-- reduces cognitive load for learning one consistent key model
-
-Current behavior to know:
-- in Evil normal state, use Vim-native motions (including =C-d= /=C-u= / =C-o=)
-- in minibuffer/Emacs state, default Emacs behavior remains intact
 
 * AI
 I integrated my neovim into pi very heavily.

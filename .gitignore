@@ -23,6 +23,7 @@ savehist
 save-place
 history
 network-security.data
+tree-sitter/
 
 # Lock/backup/autosave files
 *~
