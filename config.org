@@ -52,6 +52,15 @@ This keeps formatting focused on code blocks and avoids accidental edits to surr
 - =C-v / M-v= :: page down / page up
 - In Evil normal state: =C-d= and =C-u= already do Vim-style half-page scrolling
 
+** Evil textobjects (tree-sitter)
+- =af= / =if= :: around / inside function
+- =ac= / =ic= :: around / inside class
+- =al= / =il= :: around / inside loop
+- =ai= / =ii= :: around / inside conditional
+- =a,= / =i,= :: around / inside parameter
+- Examples: =daf= delete function, =yic= yank inside class, =ci,= change current parameter
+- Note: these work best in buffers with active tree-sitter parsers.
+
 ** Window/buffer basics
 - =C-x o= :: move to other window
 - =C-x 2= / =C-x 3= :: split below / split right
@@ -209,7 +218,9 @@ Why this setup:
     (setq evil-want-integration t
           evil-want-keybinding nil
           evil-want-C-u-scroll t
-          evil-undo-system 'undo-redo)
+          evil-undo-system 'undo-redo
+  		evil-visual-update-x-selection-p nil
+  		evil-kill-on-visual-paste nil)
     :config
     (evil-mode 1))
 
@@ -471,6 +482,321 @@ this is called =flex= matching in their parlance.
 mr cheeze bot has the thread on this
 
 * LSP + completion + formatting + linting
+#+begin_src emacs-lisp
+  ;; Tree-sitter mode remap/fallback/install flow.
+  (use-package treesit-auto
+    :if (fboundp 'treesit-available-p)
+    :demand t
+    :custom
+    ;; Prompt before cloning/building grammar.
+    (treesit-auto-install 'prompt)
+    :config
+    ;; Match language surface area from the current Neovim config.
+    ;; Note: terraform/hcl isn't in treesit-auto's built-in recipe list.
+    (setq treesit-auto-langs
+          '(python
+            javascript typescript tsx json
+            html css
+            bash
+            lua
+            go gomod gowork
+            rust
+            zig
+            yaml sql markdown toml dockerfile))
+
+    ;; Ensure these extensions map to a real mode instead of fundamental-mode.
+    (treesit-auto-add-to-auto-mode-alist
+     '(python
+       javascript typescript tsx json
+       html css
+       bash
+       lua
+       go gomod gowork
+       rust
+       zig
+       yaml sql markdown toml dockerfile))
+
+    (global-treesit-auto-mode 1))
+
+  ;; In-buffer completion UI.
+  (use-package corfu
+    :init
+    (global-corfu-mode 1)
+    :custom
+    (corfu-auto t)
+    (corfu-auto-delay 0.12)
+    (corfu-auto-prefix 1)
+    (corfu-preview-current nil)
+    (corfu-cycle t)
+    :bind
+    (:map corfu-map
+          ("TAB" . corfu-next)
+          ([tab] . corfu-next)
+          ("S-TAB" . corfu-previous)
+          ([backtab] . corfu-previous)))
+
+  ;; Extra completion sources (CAPF extensions).
+  (use-package cape
+    :after corfu
+    :init
+    (add-to-list 'completion-at-point-functions #'cape-file t)
+    (add-to-list 'completion-at-point-functions #'cape-dabbrev t)
+    :config
+    (with-eval-after-load 'eglot
+      ;; Keep Eglot completion candidates fresh as buffer changes.
+      (advice-add 'eglot-completion-at-point :around #'cape-wrap-buster)))
+
+  (defun jorge/eglot-ensure ()
+    "Start Eglot for current buffer when appropriate."
+    (unless (or (minibufferp)
+                (file-remote-p default-directory))
+      (eglot-ensure)))
+
+  (use-package eglot
+    :ensure nil
+    :demand t
+    :hook ((python-mode . jorge/eglot-ensure)
+           (python-ts-mode . jorge/eglot-ensure)
+           (js-mode . jorge/eglot-ensure)
+           (js-ts-mode . jorge/eglot-ensure)
+           (javascript-mode . jorge/eglot-ensure)
+           (typescript-mode . jorge/eglot-ensure)
+           (typescript-ts-mode . jorge/eglot-ensure)
+           (tsx-ts-mode . jorge/eglot-ensure))
+    :config
+    (let ((py-server (eglot-alternatives
+                      '(("basedpyright-langserver" "--stdio")
+                        ("pyright-langserver" "--stdio"))))
+          (ts-server (eglot-alternatives
+                      '(("typescript-language-server" "--stdio")
+                        ("bunx" "--bun" "typescript-language-server" "--stdio")
+                        ("npx" "typescript-language-server" "--stdio")))))
+      ;; Use setf/alist-get so reloading config doesn't duplicate entries.
+      (setf (alist-get '(python-mode python-ts-mode)
+                       eglot-server-programs nil nil #'equal)
+            py-server
+            (alist-get '(js-mode js-ts-mode javascript-mode typescript-mode typescript-ts-mode tsx-ts-mode)
+                       eglot-server-programs nil nil #'equal)
+            ts-server))
+
+    ;; Keep import organization with Ruff/Biome tooling pipeline.
+    (setq-default eglot-workspace-configuration
+                  '((:pyright . (:disableOrganizeImports t))
+                    (:basedpyright . (:disableOrganizeImports t))))
+
+    (require 'consult-flymake nil t)
+
+    (defun jorge/diagnostics-list ()
+      "Open diagnostics list, preferring consult-flymake."
+      (interactive)
+      (cond
+       ((fboundp 'consult-flymake)
+        (consult-flymake))
+       ((fboundp 'flymake-show-buffer-diagnostics)
+        (flymake-show-buffer-diagnostics))
+       (t
+        (user-error "No diagnostics list command available"))))
+
+    ;; LSP core parity bindings.
+    (define-key jorge/leader-map (kbd "k") #'eldoc-doc-buffer)
+    (define-key jorge/leader-map (kbd "d") #'display-local-help)
+    (define-key jorge/leader-map (kbd "c a") #'eglot-code-actions)
+    (define-key jorge/leader-map (kbd "r") #'eglot-rename)
+    (define-key jorge/leader-map (kbd "s d") #'jorge/diagnostics-list)
+    (define-key jorge/leader-map (kbd "p d") #'flymake-show-project-diagnostics)
+
+    (with-eval-after-load 'evil
+      (define-key evil-normal-state-map (kbd "gd") #'xref-find-definitions)
+      (define-key evil-normal-state-map (kbd "gr") #'xref-find-references)
+      (define-key evil-normal-state-map (kbd "gi") #'eglot-find-implementation)))
+
+  ;; Ruff diagnostics for python buffers (alongside pyright/basedpyright typing).
+  (use-package flymake-ruff
+    :hook ((python-mode . flymake-ruff-load)
+           (python-ts-mode . flymake-ruff-load)))
+
+  ;; Formatter orchestration (manual only; no format-on-save).
+  (use-package apheleia
+    :config
+    (setf (alist-get 'biome apheleia-formatters)
+          '("biome" "format" "--stdin-file-path" filepath))
+    (setf (alist-get 'ruff-format apheleia-formatters)
+          '("ruff" "format" "--stdin-filename" filepath "-"))
+
+    ;; Biome-first for JS/TS + Ruff for Python.
+    (setf (alist-get 'js-mode apheleia-mode-alist) 'biome
+          (alist-get 'js-ts-mode apheleia-mode-alist) 'biome
+          (alist-get 'javascript-mode apheleia-mode-alist) 'biome
+          (alist-get 'typescript-mode apheleia-mode-alist) 'biome
+          (alist-get 'typescript-ts-mode apheleia-mode-alist) 'biome
+          (alist-get 'tsx-ts-mode apheleia-mode-alist) 'biome
+          (alist-get 'json-mode apheleia-mode-alist) 'biome
+          (alist-get 'json-ts-mode apheleia-mode-alist) 'biome
+          (alist-get 'python-mode apheleia-mode-alist) 'ruff-format
+          (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff-format)
+
+    (defun jorge/format-file ()
+      "Format current file manually.
+Prefer Apheleia formatter mappings, fallback to LSP format."
+      (interactive)
+      (cond
+       ((alist-get major-mode apheleia-mode-alist)
+        (apheleia-format-buffer))
+       ((bound-and-true-p eglot-managed-mode)
+        (eglot-format-buffer))
+       (t
+        (user-error "No formatter configured for %s" major-mode))))
+
+    (define-key jorge/leader-map (kbd "f f") #'jorge/format-file))
+
+  (with-eval-after-load 'which-key
+    (which-key-add-key-based-replacements
+      "SPC f f" "format file"
+      "SPC k" "hover/help"
+      "SPC d" "diagnostic at point"
+      "SPC c a" "code action"
+      "SPC r" "rename symbol"
+      "SPC s d" "diagnostics list"
+      "SPC p d" "project diagnostics"
+      "gd" "go to definition"
+      "gr" "go to references"
+      "gi" "go to implementation"))
+
+  ;; Tree-sitter powered evil textobjects.
+  ;; Package: https://github.com/meain/evil-textobj-tree-sitter
+  (use-package evil-textobj-tree-sitter
+    :after evil
+    :config
+    ;; Match Neovim-style textobjects where available.
+    ;; - af/if => function
+    ;; - ac/ic => class
+    ;; - al/il => loop
+    ;; - ai/ii => conditional
+    ;; - a, / i, => parameter
+    (define-key evil-outer-text-objects-map "f"
+                (evil-textobj-tree-sitter-get-textobj "function.outer"))
+    (define-key evil-inner-text-objects-map "f"
+                (evil-textobj-tree-sitter-get-textobj "function.inner"))
+
+    (define-key evil-outer-text-objects-map "c"
+                (evil-textobj-tree-sitter-get-textobj "class.outer"))
+    (define-key evil-inner-text-objects-map "c"
+                (evil-textobj-tree-sitter-get-textobj "class.inner"))
+
+    (define-key evil-outer-text-objects-map "l"
+                (evil-textobj-tree-sitter-get-textobj "loop.outer"))
+    (define-key evil-inner-text-objects-map "l"
+                (evil-textobj-tree-sitter-get-textobj "loop.inner"))
+
+    (define-key evil-outer-text-objects-map "i"
+                (evil-textobj-tree-sitter-get-textobj "conditional.outer"))
+    (define-key evil-inner-text-objects-map "i"
+                (evil-textobj-tree-sitter-get-textobj "conditional.inner"))
+
+    (define-key evil-outer-text-objects-map ","
+                (evil-textobj-tree-sitter-get-textobj "parameter.outer"))
+    (define-key evil-inner-text-objects-map ","
+                (evil-textobj-tree-sitter-get-textobj "parameter.inner")))
+
+  ;; Neovim-parity tree-sitter motions: ]f/[f, ]c/[c, ]l, ]s/[s, ]i/[i, ]z
+  ;; (start/end variants for function/class use uppercase like ]F/[F, ]C/[C).
+  (defconst jorge/treesit-motion-regex-alist
+    '((function . "\\`\\(?:function\\(?:_\\(?:definition\\|declaration\\|expression\\|item\\|signature\\)\\)?\\|method\\(?:_\\(?:definition\\|declaration\\)\\)?\\|arrow_function\\|generator_function_declaration\\|lexical_declaration\\|decorated_definition\\|function_item\\)\\'")
+      (class . "\\`\\(?:class\\(?:_\\(?:definition\\|declaration\\|body\\)\\)?\\|impl_item\\|trait_item\\)\\'")
+      (loop . "\\`\\(?:for\\(?:_\\(?:statement\\|in_statement\\|of_statement\\)\\)?\\|while_statement\\|do_statement\\|loop_expression\\|loop_statement\\|repeat_statement\\)\\'")
+      (scope . "\\`\\(?:statement_block\\|block\\|class_body\\|program\\|module\\|namespace_body\\)\\'")
+      (conditional . "\\`\\(?:if_statement\\|if_expression\\|switch_statement\\|match_expression\\|conditional_expression\\|case_clause\\)\\'")
+      ;; fold-ish fallback when dedicated fold captures aren't available
+      (fold . "\\`\\(?:statement_block\\|block\\|class_body\\|program\\|module\\|namespace_body\\)\\'"))
+    "Node-type regexes used for tree-sitter movement commands.")
+
+  (defun jorge/treesit--motion-predicate (kind)
+    "Resolve movement predicate for KIND."
+    (cond
+     ;; Prefer mode-provided defun navigation when available.
+     ((and (eq kind 'function) (treesit-thing-defined-p 'defun))
+      'defun)
+     (t
+      (or (alist-get kind jorge/treesit-motion-regex-alist)
+          (user-error "Unknown treesit motion kind: %s" kind)))))
+
+  (defun jorge/treesit-goto (kind backward goto-start)
+    "Move point using tree-sitter by KIND.
+If BACKWARD is non-nil, search backward. If GOTO-START is non-nil,
+move to node start; otherwise move to node end."
+    (unless (and (fboundp 'treesit-node-at)
+                 (treesit-parser-list))
+      (user-error "No tree-sitter parser active in this buffer"))
+    (let* ((start-node (or (treesit-node-at (point))
+                           (treesit-buffer-root-node)))
+           (predicate (jorge/treesit--motion-predicate kind))
+           (node (treesit-search-forward-goto
+                  start-node predicate goto-start backward t)))
+      (unless node
+        (user-error "No %s found" kind))))
+
+  ;; Function motions
+  (defun jorge/treesit-next-function-start () (interactive) (jorge/treesit-goto 'function nil t))
+  (defun jorge/treesit-next-function-end ()   (interactive) (jorge/treesit-goto 'function nil nil))
+  (defun jorge/treesit-prev-function-start () (interactive) (jorge/treesit-goto 'function t t))
+  (defun jorge/treesit-prev-function-end ()   (interactive) (jorge/treesit-goto 'function t nil))
+
+  ;; Class motions
+  (defun jorge/treesit-next-class-start () (interactive) (jorge/treesit-goto 'class nil t))
+  (defun jorge/treesit-next-class-end ()   (interactive) (jorge/treesit-goto 'class nil nil))
+  (defun jorge/treesit-prev-class-start () (interactive) (jorge/treesit-goto 'class t t))
+  (defun jorge/treesit-prev-class-end ()   (interactive) (jorge/treesit-goto 'class t nil))
+
+  ;; Other tree-sitter motions
+  (defun jorge/treesit-next-loop-start ()        (interactive) (jorge/treesit-goto 'loop nil t))
+  (defun jorge/treesit-next-scope-start ()       (interactive) (jorge/treesit-goto 'scope nil t))
+  (defun jorge/treesit-prev-scope-start ()       (interactive) (jorge/treesit-goto 'scope t t))
+  (defun jorge/treesit-next-conditional-start () (interactive) (jorge/treesit-goto 'conditional nil t))
+  (defun jorge/treesit-prev-conditional-start () (interactive) (jorge/treesit-goto 'conditional t t))
+  (defun jorge/treesit-next-fold-start ()        (interactive) (jorge/treesit-goto 'fold nil t))
+
+  (with-eval-after-load 'evil
+    ;; diagnostics (already matching Neovim muscle memory)
+    (define-key evil-normal-state-map (kbd "]d") #'flymake-goto-next-error)
+    (define-key evil-normal-state-map (kbd "[d") #'flymake-goto-prev-error)
+
+    ;; tree-sitter motion parity
+    (define-key evil-normal-state-map (kbd "]f") #'jorge/treesit-next-function-start)
+    (define-key evil-normal-state-map (kbd "]F") #'jorge/treesit-next-function-end)
+    (define-key evil-normal-state-map (kbd "[f") #'jorge/treesit-prev-function-start)
+    (define-key evil-normal-state-map (kbd "[F") #'jorge/treesit-prev-function-end)
+
+    (define-key evil-normal-state-map (kbd "]c") #'jorge/treesit-next-class-start)
+    (define-key evil-normal-state-map (kbd "]C") #'jorge/treesit-next-class-end)
+    (define-key evil-normal-state-map (kbd "[c") #'jorge/treesit-prev-class-start)
+    (define-key evil-normal-state-map (kbd "[C") #'jorge/treesit-prev-class-end)
+
+    (define-key evil-normal-state-map (kbd "]l") #'jorge/treesit-next-loop-start)
+    (define-key evil-normal-state-map (kbd "]s") #'jorge/treesit-next-scope-start)
+    (define-key evil-normal-state-map (kbd "[s") #'jorge/treesit-prev-scope-start)
+    (define-key evil-normal-state-map (kbd "]i") #'jorge/treesit-next-conditional-start)
+    (define-key evil-normal-state-map (kbd "[i") #'jorge/treesit-prev-conditional-start)
+    (define-key evil-normal-state-map (kbd "]z") #'jorge/treesit-next-fold-start))
+
+  (with-eval-after-load 'which-key
+    (which-key-add-key-based-replacements
+      "]f" "next function start"
+      "]F" "next function end"
+      "[f" "prev function start"
+      "[F" "prev function end"
+      "]c" "next class start"
+      "]C" "next class end"
+      "[c" "prev class start"
+      "[C" "prev class end"
+      "]l" "next loop"
+      "]s" "next scope"
+      "[s" "prev scope"
+      "]i" "next conditional"
+      "[i" "prev conditional"
+      "]z" "next fold"
+      "]d" "next diagnostic"
+      "[d" "prev diagnostic"))
+#+end_src
 
 * UI defaults
 ** font
