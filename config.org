@@ -315,6 +315,24 @@ Why this setup:
 
   (define-key jorge/leader-map (kbd "c r") #'jorge/reload-literate-config)
 
+  (defun jorge/copy-buffer-full-filename ()
+    (interactive)
+    (when buffer-file-name
+  	(let ((filename (file-truename buffer-file-name)))
+  	  (kill-new filename)
+  	  (message "Copied %s" filename))))
+
+  (defun jorge/copy-buffer-rel-filename ()
+    (interactive)
+    (when buffer-file-name
+  	(let ((filename
+  		  (replace-regexp-in-string (expand-file-name (jorge/default-dir)) "" (file-truename buffer-file-name))))
+  	  (kill-new filename)
+  	  (message "Copied %s" filename))))
+
+  (define-key jorge/leader-map (kbd "f c") #'jorge/copy-buffer-rel-filename)
+  (define-key jorge/leader-map (kbd "f C") #'jorge/copy-buffer-full-filename)
+
   ;; when we open a help page, it doesn't auto focus unless this is set
   (setq help-window-select t)
   (define-key jorge/leader-map (kbd "h o") #'describe-symbol)
