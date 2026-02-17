@@ -97,13 +97,18 @@ once ready, press =x= and poof!
   - =RET= open file/dir
   - =^= go to parent directory
   - =g= refresh listing
+  - =m= mark file, =u= unmark file, =U= unmark all
+  - =C= copy marked/current files
+  - =R= rename/move marked/current files
   - =+= create directory
   - =M-x dired-create-empty-file= create empty file
   - =C-x C-f= create/open file path in this directory
+- 2-pane workflow (Oil-like): open 2 Dired windows, mark files in source, press =R= (move) or =C= (copy), then =RET= to accept the other Dired window as target
 
 ** Wdired (inline rename mode)
 - =C-x C-q= :: toggle editable Dired (rename/move existing entries inline)
 - Edit names/paths directly in buffer
+  - Move across directories by editing to a relative/absolute path, e.g. =foo.txt= -> =../archive/foo.txt=
 - =C-c C-c= :: apply changes
 - =C-c C-k= :: cancel changes
 - NOTE: create new files/dirs in regular Dired (not in Wdired)
@@ -519,6 +524,26 @@ i just learned embark gives me the ability to export search results into a persi
 this is called =flex= matching in their parlance. 
 mr cheeze bot has the thread on this
 
+* Dired + Wdired (2-pane workflow)
+This keeps Dired fast for cross-directory file moves/copies.
+
+#+begin_src emacs-lisp
+  (use-package dired
+    :ensure nil
+    :commands (dired dired-jump)
+    :custom
+    ;; If two Dired windows are open, default copy/rename target to the other one.
+    ;; This is the closest built-in flow to Oil-style "operate in one pane, send to another".
+    (dired-dwim-target t)
+    ;; Avoid repeated prompts when operating on directories.
+    (dired-recursive-copies 'always)
+    (dired-recursive-deletes 'top))
+
+  (use-package wdired
+    :ensure nil
+    :after dired)
+#+end_src
+
 * LSP + completion + formatting + linting
 #+begin_src emacs-lisp
   ;; Tree-sitter mode remap/fallback/install flow.
@@ -617,6 +642,8 @@ mr cheeze bot has the thread on this
                        eglot-server-programs nil nil #'equal)
             ts-server))
 
+    (setq project-vc-extra-root-markers '("package.json" "tsconfig.json"))
+
     ;; Keep import organization with Ruff/Biome tooling pipeline.
     (setq-default eglot-workspace-configuration
                   '((:pyright . (:disableOrganizeImports t))
@@ -636,7 +663,6 @@ mr cheeze bot has the thread on this
         (user-error "No diagnostics list command available"))))
 
     ;; LSP core parity bindings.
-    (define-key jorge/leader-map (kbd "k") #'eldoc-doc-buffer)
     (define-key jorge/leader-map (kbd "d") #'display-local-help)
     (define-key jorge/leader-map (kbd "c a") #'eglot-code-actions)
     (define-key jorge/leader-map (kbd "r") #'eglot-rename)
@@ -647,6 +673,14 @@ mr cheeze bot has the thread on this
       (define-key evil-normal-state-map (kbd "gd") #'xref-find-definitions)
       (define-key evil-normal-state-map (kbd "gr") #'xref-find-references)
       (define-key evil-normal-state-map (kbd "gi") #'eglot-find-implementation)))
+
+  ;; Floating docs near point (inline popup) for Eglot/ElDoc.
+  ;; Keep this on-demand to avoid constant hover noise while editing.
+  (use-package eldoc-box
+    :after eglot
+    :commands (eldoc-box-help-at-point)
+    :config
+    (define-key jorge/leader-map (kbd "k") #'eldoc-box-help-at-point))
 
   ;; Ruff diagnostics for python buffers (alongside pyright/basedpyright typing).
   (use-package flymake-ruff
@@ -697,7 +731,7 @@ mr cheeze bot has the thread on this
 
     (defun jorge/format-file ()
       "Format current file manually.
-Prefer Apheleia formatter mappings, fallback to LSP format."
+  Prefer Apheleia formatter mappings, fallback to LSP format."
       (interactive)
       (let ((formatters (apheleia--get-formatters)))
         (cond
@@ -783,8 +817,8 @@ Prefer Apheleia formatter mappings, fallback to LSP format."
 
   (defun jorge/treesit-goto (kind backward goto-start)
     "Move point using tree-sitter by KIND.
-If BACKWARD is non-nil, search backward. If GOTO-START is non-nil,
-move to node start; otherwise move to node end."
+  If BACKWARD is non-nil, search backward. If GOTO-START is non-nil,
+  move to node start; otherwise move to node end."
     (unless (and (fboundp 'treesit-node-at)
                  (treesit-parser-list))
       (user-error "No tree-sitter parser active in this buffer"))
