@@ -97,6 +97,16 @@ once ready, press =x= and poof!
   - =RET= open file/dir
   - =^= go to parent directory
   - =g= refresh listing
+  - =+= create directory
+  - =M-x dired-create-empty-file= create empty file
+  - =C-x C-f= create/open file path in this directory
+
+** Wdired (inline rename mode)
+- =C-x C-q= :: toggle editable Dired (rename/move existing entries inline)
+- Edit names/paths directly in buffer
+- =C-c C-c= :: apply changes
+- =C-c C-k= :: cancel changes
+- NOTE: create new files/dirs in regular Dired (not in Wdired)
 
 ** Reload file/config
 - =M-x revert-buffer RET= :: reload current file from disk (after external changes)
