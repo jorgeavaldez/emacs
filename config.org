@@ -973,10 +973,35 @@ This package should give us a more emacs-native use of everything.
     :init (defalias 'pi 'pi-coding-agent)
     :custom
     (pi-coding-agent-copy-raw-markdown t)            ; Keep raw markdown on copy (default: strip hidden markup)
-    (pi-coding-agent-input-markdown-highlighting t)  ; GFM syntax highlighting in input buffer
-    )
+    (pi-coding-agent-input-markdown-highlighting t)) ; GFM syntax highlighting in input buffer
 
-  (define-key jorge/leader-map (kbd "a i") #'pi)
+  (defun jorge/pi--live-session-count ()
+    "Return count of live pi chat session buffers."
+    (let ((count 0))
+      (dolist (buf (buffer-list) count)
+        (when (string-prefix-p "*pi-coding-agent-chat:" (buffer-name buf))
+          (setq count (1+ count))))))
+
+  (defun jorge/pi ()
+    "Start a named pi session in a user-selected directory.
+Defaults session name to \"session-N\" based on live pi sessions.
+Prompts for directory, defaulting to project root via `jorge/default-dir',
+falling back to `default-directory'."
+    (interactive)
+    (require 'pi-coding-agent)
+    (let* ((default-name (format "session-%d" (1+ (jorge/pi--live-session-count))))
+           (session-name (read-string "Pi session name: " default-name nil default-name))
+           (dir (file-name-as-directory
+                 (expand-file-name
+                  (read-directory-name "Pi directory: " (jorge/default-dir) nil t))))
+           chat-buf
+           input-buf)
+      (pi-coding-agent--check-dependencies)
+      (setq chat-buf (pi-coding-agent--setup-session dir session-name))
+      (setq input-buf (buffer-local-value 'pi-coding-agent--input-buffer chat-buf))
+      (pi-coding-agent--display-buffers chat-buf input-buf)))
+
+  (define-key jorge/leader-map (kbd "a i") #'jorge/pi)
 #+end_src
 
 * Markdown
@@ -1073,28 +1098,8 @@ we can chat in a group forum type, like our openclaw setup, and filter to send m
 that's how i'm chatting to the emacs mistah cheeze and it's working well.
 
 * next up!
-** get jj working
-*** prompt
-read through /Users/jorge/obsidian/delvaze/garden/migration-to-emacs.md very carefully
-this is my migration to emacs plan.
-i'm currently using neovim but i'm switching over piece by piece and i'm trying to learn everything from first principles.
-right now, i want to start integration w/ jj for vcs control.
-~/.config/nvim/lua/jorge/jj.lua contains my current neovim vcs stuff.
-i'm looking at potentially using majutsu since i prefer jj. i'm already a bit used to magit so it's familiar.
-review the plan, then give me an overview of how you're going to update my config.
-be sure to keep it straightforward for now. let me know of possible improvements.
-review my keybindings from neovim for vcs stuff and offer analogous ones. for the most part, i require `SPC gs` at a minimum.
-if you have any clarifying questions, comments, concerns, STOP and let me address them for you before you continue.
 ** ergonomic pi
-pi mode sucks so far because opening a bunch gets unwieldy w/ having to pop up both the input + the view buffers at the same time.
-i want to open it in a new tab, and have tab nav bindings
-~SPC t~ menu.
-~SPC tn~ next.
-~SPC tp~ prev.
-~SPC tl~ search menu.
-when i run ~SPC ai~, i want it to by default run ~C-u M-x pi~, with a default name (some number, counting the curr session),
-allowing me to rename if i desire.
-when pressing enter, i want it to open in a new tab on its own.
+we did the named ai buffer thing, i'll see how it works for multiple pis now.
 if i swap to a pi buffer, i want it to also bring along it's buddy the chat view, or the input view, depending on which one i bring.
 it should be the one specific to that session.
 if i can do that then that's better than weird tabs stuff. i prefer single buffer nav.
