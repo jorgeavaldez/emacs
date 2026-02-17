@@ -873,6 +873,13 @@ For now, keep JJ intentionally small:
     ;; Minimal JJ muscle-memory starter: home base log view.
     (define-key jorge/leader-map (kbd "j j") #'majutsu-log))
 
+  (with-eval-after-load 'evil
+    (with-eval-after-load 'majutsu
+      ;; In Evil normal state, bare `G` is `evil-goto-line` (end of buffer).
+      ;; Rebind it in Majutsu buffers to the Majutsu Git transient.
+      (evil-define-key* '(normal visual motion) majutsu-mode-map
+        (kbd "G") #'majutsu-git-transient)))
+
   (with-eval-after-load 'which-key
     (which-key-add-key-based-replacements
       "SPC j" "jujutsu"
@@ -1322,10 +1329,27 @@ we can chat in a group forum type, like our openclaw setup, and filter to send m
 that's how i'm chatting to the emacs mistah cheeze and it's working well.
 
 * next up!
-** ergonomic pi
-we did the named ai buffer thing, i'll see how it works for multiple pis now.
-if i swap to a pi buffer, i want it to also bring along it's buddy the chat view, or the input view, depending on which one i bring.
-it should be the one specific to that session.
-if i can do that then that's better than weird tabs stuff. i prefer single buffer nav.
-https://github.com/nex3/perspective-el
-this perspective thing might give me exactly what i want too.
+** TODO split the pi input window correctly
+when we split vertical, the chat input window stays 100vw which is nasty. i want it to split along with the chat buffer.
+** TODO investigate winner-mode for layout undo/redo
+=winner-mode= is a built-in Emacs feature that tracks window layout history.
+think of it like /undo and redo, but for split arrangements instead of text edits.
+
+what it is:
+- built into Emacs (no external package needed)
+- keeps a history stack of window configurations (splits, buffer placement, sizes)
+- lets me quickly roll back a bad layout change
+
+what it does for my workflow:
+- when pi or other commands reorganize windows, i can pop back to the previous layout instantly
+- when i "overshoot" while experimenting with split changes, i can step backward/forward through layouts
+- reduces friction from constant file/buffer/session switching because layout mistakes become cheap
+
+likely commands to use:
+- =winner-undo= :: restore the previous window layout
+- =winner-redo= :: go forward again after undoing
+
+ticket goal:
+- evaluate if winner-mode smooths out the pi split/reset workflow enough to make it default
+- if yes, add minimal config + leader bindings in a later change
+- if no, document why and keep current custom layout helpers only
