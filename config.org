@@ -23,6 +23,7 @@ This keeps formatting focused on code blocks and avoids accidental edits to surr
 - =SPC f f= :: format file
 - =SPC b b= :: switch buffer (Consult)
 - =SPC j j= :: JJ log (Majutsu home base)
+- =SPC p v= :: open file's directory in Dired (Oil-ish)
 - =SPC /= :: project grep (ripgrep)
 - =SPC s l= :: search in current buffer
 - =SPC s i= :: jump to symbol (imenu)
@@ -363,6 +364,7 @@ Why this setup:
       "SPC f" "files"
       "SPC h" "help"
       "SPC p" "project"
+      "SPC p v" "open file dir (dired)"
       "SPC s" "search/symbols"
       "SPC w" "windows"
       "SPC SPC" "M-x / command palette"
@@ -445,6 +447,15 @@ Why this is useful:
     (interactive)
     (consult-fd (read-directory-name "Scope to: " (jorge/default-dir))))
 
+  (defun jorge/dired-here ()
+    "Open Dired in current file's directory.
+If current buffer has no file, fallback to `default-directory'."
+    (interactive)
+    (let ((dir (if buffer-file-name
+                   (file-name-directory (file-truename buffer-file-name))
+                 default-directory)))
+      (dired dir)))
+
   (use-package consult
     :config
     ;; Better previews for registers and xref results.
@@ -485,6 +496,7 @@ Why this is useful:
     (define-key jorge/leader-map (kbd "s s") #'jorge/consult-ripgrep-dir)
     (define-key jorge/leader-map (kbd "p f") #'consult-fd)
     (define-key jorge/leader-map (kbd "p F") #'jorge/consult-fd-dir)
+    (define-key jorge/leader-map (kbd "p v") #'jorge/dired-here)
     (define-key jorge/leader-map (kbd "s f") #'jorge/consult-fd-dir))
 #+end_src
 
