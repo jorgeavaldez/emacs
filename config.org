@@ -1066,71 +1066,52 @@ This package should give us a more emacs-native use of everything.
   (defun jorge/pi--reset-session-fullframe (chat-buf input-buf)
     "Reset CHAT-BUF/INPUT-BUF to a fresh full-frame pi layout."
     (delete-other-windows)
-    (jorge/pi--display-session-default chat-buf input-buf (selected-window))
-    (balance-windows))
+    (jorge/pi--display-session-default chat-buf input-buf (selected-window)))
 
-  (defun jorge/pi--layout-non-pi-left-session-right (left-buffer right-chat right-input)
-    "Create 50/50 split: LEFT-BUFFER on left, RIGHT-CHAT/RIGHT-INPUT on right."
+  (defun jorge/pi--focus-input (input-buf)
+    "Focus INPUT-BUF if it is visible in a live window."
+    (let ((win (get-buffer-window input-buf)))
+      (when (window-live-p win)
+        (select-window win))))
+
+  (defun jorge/pi--first-visible-other-session (target-chat)
+    "Return (CHAT INPUT) for first visible session that is not TARGET-CHAT."
+    (let (found)
+      (dolist (chat (jorge/pi--visible-chat-sessions))
+        (let ((input (jorge/pi--session-input-buffer chat)))
+          (when (and (not found)
+                     (buffer-live-p input)
+                     (not (eq chat target-chat)))
+            (setq found (list chat input)))))
+      found))
+
+  (defun jorge/pi--layout-buffer-and-session (context-buffer chat-buf input-buf &optional session-in-first-window)
+    "Create a 50/50 side split with CONTEXT-BUFFER and pi CHAT-BUF/INPUT-BUF.
+When SESSION-IN-FIRST-WINDOW is non-nil, keep session in the selected
+window's half and show CONTEXT-BUFFER in the newly split half."
     (delete-other-windows)
-    (let ((left-win (selected-window))
-          right-win)
-      (set-window-buffer left-win left-buffer)
-      (setq right-win (split-window-right))
-      (balance-windows)
-      ;; New split content always lives on the right.
-      (jorge/pi--display-session-default right-chat right-input right-win)
-      (balance-windows)))
+    (let ((first-win (selected-window))
+          (second-win (split-window-right)))
+      (if session-in-first-window
+          (progn
+            (jorge/pi--display-session-default chat-buf input-buf first-win)
+            (set-window-buffer second-win context-buffer))
+        (set-window-buffer first-win context-buffer)
+        (jorge/pi--display-session-default chat-buf input-buf second-win))))
 
-  (defun jorge/pi--layout-session-left-session-right (left-chat left-input right-chat right-input)
-    "Create 50/50 split with pi session LEFT and pi session RIGHT."
+  (defun jorge/pi--layout-two-sessions (chat-a input-a chat-b input-b &optional session-a-in-first-window)
+    "Create a 50/50 side split with two pi sessions.
+When SESSION-A-IN-FIRST-WINDOW is non-nil, keep CHAT-A/INPUT-A in the
+selected window's half and show CHAT-B/INPUT-B in the new half."
     (delete-other-windows)
-    (let ((left-win (selected-window))
-          right-win)
-      (setq right-win (split-window-right))
-      (balance-windows)
-      (jorge/pi--display-session-default left-chat left-input left-win)
-      ;; New split content always lives on the right.
-      (jorge/pi--display-session-default right-chat right-input right-win)
-      (balance-windows)))
-
-  (defun jorge/pi--choose-left-context (target-chat &optional current-chat)
-    "Pick left-half context while showing TARGET-CHAT on right.
-Prefer CURRENT-CHAT when provided and distinct from TARGET-CHAT,
-then any visible other pi session, then selected non-pi buffer."
-    (let ((current-input (and (buffer-live-p current-chat)
-                              (jorge/pi--session-input-buffer current-chat))))
-      (cond
-       ((and (buffer-live-p current-chat)
-             (buffer-live-p current-input)
-             (not (eq current-chat target-chat)))
-        (list :session current-chat current-input))
-       (t
-        (let ((visible (jorge/pi--visible-chat-sessions))
-              found)
-          (dolist (chat visible)
-            (let ((input (jorge/pi--session-input-buffer chat)))
-              (when (and (not found)
-                         (buffer-live-p input)
-                         (not (eq chat target-chat)))
-                (setq found (list :session chat input)))))
-          (or found
-              (let ((buf (or (jorge/pi--selected-non-pi-buffer)
-                             (jorge/pi--first-visible-non-pi-buffer))))
-                (when (buffer-live-p buf)
-                  (list :buffer buf)))))))))
-
-  (defun jorge/pi--show-session-on-right (target-chat target-input &optional current-chat)
-    "Show TARGET-CHAT/TARGET-INPUT on right, preserving best left context."
-    (let ((left (jorge/pi--choose-left-context target-chat current-chat)))
-      (cond
-       ((and left (eq (car left) :session))
-        (jorge/pi--layout-session-left-session-right
-         (nth 1 left) (nth 2 left) target-chat target-input))
-       ((and left (eq (car left) :buffer))
-        (jorge/pi--layout-non-pi-left-session-right
-         (nth 1 left) target-chat target-input))
-       (t
-        (jorge/pi--reset-session-fullframe target-chat target-input)))))
+    (let ((first-win (selected-window))
+          (second-win (split-window-right)))
+      (if session-a-in-first-window
+          (progn
+            (jorge/pi--display-session-default chat-a input-a first-win)
+            (jorge/pi--display-session-default chat-b input-b second-win))
+        (jorge/pi--display-session-default chat-b input-b first-win)
+        (jorge/pi--display-session-default chat-a input-a second-win))))
 
   (defun jorge/pi--session-candidate (chat-buf)
     "Return completion candidate pair (DISPLAY . CHAT-BUF) for CHAT-BUF."
@@ -1166,7 +1147,8 @@ falling back to `default-directory'."
   (defun jorge/pi-summon-paired-buffer ()
     "Summon/reset current pi pair.
 Only meaningful from pi chat/input buffers.
-If any non-pi buffer is visible, keep non-pi on left and open pi on right.
+If a non-pi buffer is visible, split 50/50 and keep the current pi
+session in one half while putting that non-pi buffer in the other.
 Otherwise reset pi to fresh full-frame layout."
     (interactive)
     (require 'pi-coding-agent)
@@ -1175,16 +1157,19 @@ Otherwise reset pi to fresh full-frame layout."
            (input-buf (cadr session)))
       (unless (and (buffer-live-p chat-buf) (buffer-live-p input-buf))
         (user-error "SPC a b is only available in pi chat/input buffers"))
-      (let ((left-buf (jorge/pi--first-visible-non-pi-buffer)))
-        (if (buffer-live-p left-buf)
-            (jorge/pi--layout-non-pi-left-session-right left-buf chat-buf input-buf)
+      (let ((context-buf (or (jorge/pi--selected-non-pi-buffer)
+                             (jorge/pi--first-visible-non-pi-buffer))))
+        (if (buffer-live-p context-buf)
+            (progn
+              (jorge/pi--layout-buffer-and-session context-buf chat-buf input-buf t)
+              (jorge/pi--focus-input input-buf))
           (jorge/pi--reset-session-fullframe chat-buf input-buf)))))
 
   (defun jorge/pi-switch-live-session ()
     "Switch between live Emacs pi sessions (chat buffers only).
 Uses existing minibuffer stack (vertico/orderless/marginalia).
 Selecting current session from a pi buffer performs a full-frame reset;
-all other selections open selected session on right in a 50/50 split."
+other selections build a 50/50 side layout with sensible context."
     (interactive)
     (require 'pi-coding-agent)
     (let ((sessions (jorge/pi--live-chat-sessions)))
@@ -1198,13 +1183,38 @@ all other selections open selected session on right in a 50/50 split."
                (target-input (and (buffer-live-p target-chat)
                                   (jorge/pi--session-input-buffer target-chat)))
                (current-session (jorge/pi--session-buffers))
-               (current-chat (car current-session)))
+               (current-chat (car current-session))
+               (current-input (and (buffer-live-p current-chat)
+                                   (jorge/pi--session-input-buffer current-chat)))
+               (visible-other (jorge/pi--first-visible-other-session target-chat))
+               (context-buf (or (jorge/pi--selected-non-pi-buffer)
+                                (jorge/pi--first-visible-non-pi-buffer))))
           (unless (and (buffer-live-p target-chat) (buffer-live-p target-input))
             (user-error "Selected pi session is no longer live"))
-          (if (and (buffer-live-p current-chat)
-                   (eq current-chat target-chat))
-              (jorge/pi--reset-session-fullframe target-chat target-input)
-            (jorge/pi--show-session-on-right target-chat target-input current-chat))))))
+          (cond
+           ((and (buffer-live-p current-chat)
+                 (eq current-chat target-chat))
+            (jorge/pi--reset-session-fullframe target-chat target-input))
+           ((and (buffer-live-p current-chat)
+                 (buffer-live-p current-input))
+            (jorge/pi--layout-two-sessions
+             current-chat current-input
+             target-chat target-input
+             t)
+            (jorge/pi--focus-input target-input))
+           ((and (consp visible-other)
+                 (buffer-live-p (car visible-other))
+                 (buffer-live-p (cadr visible-other)))
+            (jorge/pi--layout-two-sessions
+             (car visible-other) (cadr visible-other)
+             target-chat target-input
+             t)
+            (jorge/pi--focus-input target-input))
+           ((buffer-live-p context-buf)
+            (jorge/pi--layout-buffer-and-session context-buf target-chat target-input nil)
+            (jorge/pi--focus-input target-input))
+           (t
+            (jorge/pi--reset-session-fullframe target-chat target-input)))))))
 
   (define-key jorge/leader-map (kbd "a i") #'jorge/pi)
   (define-key jorge/leader-map (kbd "a b") #'jorge/pi-summon-paired-buffer)
