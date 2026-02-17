@@ -22,6 +22,7 @@ This keeps formatting focused on code blocks and avoids accidental edits to surr
 - =SPC f o= :: open file
 - =SPC f f= :: format file
 - =SPC b b= :: switch buffer (Consult)
+- =SPC j j= :: JJ log (Majutsu home base)
 - =SPC /= :: project grep (ripgrep)
 - =SPC s l= :: search in current buffer
 - =SPC s i= :: jump to symbol (imenu)
@@ -456,7 +457,8 @@ Why this is useful:
     ;; Start searching sooner while typing
     (setq consult-async-min-input 1
           consult-async-input-debounce 0.05
-          consult-async-input-throttle 0.02)
+          consult-async-input-throttle 0.02
+  		consult-fd-args "fd --type f --hidden --no-require-git --exclude .git --exclude .jj")
 
     ;; Faster candidate preview for ripgrep
     (consult-customize

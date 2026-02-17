@@ -1,2 +1,3 @@
 ;;; -*- lisp-data -*-
-(("/Users/jorge/.emacs.d/") ("/Users/jorge/.emacs.d/elpa/phscroll/"))
+(("/Users/jorge/.emacs.d/elpa/majutsu/") ("/Users/jorge/.emacs.d/")
+ ("/Users/jorge/.emacs.d/elpa/phscroll/"))

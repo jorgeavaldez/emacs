@@ -24,6 +24,9 @@ save-place
 history
 network-security.data
 tree-sitter/
+ielm-history.eld
+transient/
+projects
 
 # Lock/backup/autosave files
 *~
@@ -32,5 +35,3 @@ tree-sitter/
 
 # macOS
 .DS_Store
-ielm-history.eld
-transient/
