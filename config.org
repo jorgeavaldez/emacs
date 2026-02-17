@@ -68,7 +68,11 @@ This keeps formatting focused on code blocks and avoids accidental edits to surr
 - =C-x 1= :: keep only current window
 - =C-x b= :: switch buffer
 - =C-x k= :: kill buffer
-
+*** Batch buffer killing
+i can run =M-x ibuffer= to open a sick buffer gui.
+move cursor to the buffers to kill, press =d= to mark the selected line for deletion (this adds a
+=D= at the beginning of the line).
+once ready, press =x= and poof!
 ** Open files by path
 - =C-x C-f= :: open file by path (=find-file=)
 - Type absolute path (e.g. =~/.config/emacs/config.org=) or relative path, then =RET=
@@ -228,6 +232,16 @@ Why this setup:
     :after evil
     :config
     (evil-collection-init))
+
+  (use-package evil-org
+    :ensure t
+    :after org
+    :hook (org-mode . (lambda () evil-org-mode))
+    :config
+    (require 'evil-org-agenda)
+    (evil-org-agenda-set-keys)
+    ;; this removes the C-i binding, which is native emacs tab
+    (setq evil-want-C-i-jump nil))
 
   (use-package which-key
     :defer 0
@@ -798,6 +812,26 @@ move to node start; otherwise move to node end."
       "[d" "prev diagnostic"))
 #+end_src
 
+* VCS / JJ (Majutsu, minimal bootstrap)
+For now, keep JJ intentionally small:
+- one entry point: =SPC j j=
+- open Majutsu log view (home base)
+- learn the Majutsu UI first before adding extra leader bindings
+
+#+begin_src emacs-lisp
+  (use-package majutsu
+    :vc (:url "https://github.com/0WD0/majutsu")
+    :commands (majutsu majutsu-log)
+    :init
+    ;; Minimal JJ muscle-memory starter: home base log view.
+    (define-key jorge/leader-map (kbd "j j") #'majutsu-log))
+
+  (with-eval-after-load 'which-key
+    (which-key-add-key-based-replacements
+      "SPC j" "jujutsu"
+      "SPC j j" "jj log (majutsu)"))
+#+end_src
+
 * UI defaults
 ** font
 #+begin_src emacs-lisp
@@ -842,6 +876,21 @@ move to node start; otherwise move to node end."
     )
 #+end_src
 
+** highlight current line in code editing type modes
+#+begin_src emacs-lisp
+  (setq global-hl-line-sticky-flag t) ;; keep highlight visible in other windows
+
+  (global-hl-line-mode 1)
+
+  ;; disable for any non-code ones
+  (defun jorge/hl-line-for-editing-buffers ()
+    (if (or (minibufferp)
+            (derived-mode-p 'special-mode 'comint-mode 'eshell-mode 'term-mode 'vterm-mode))
+        (hl-line-mode -1)
+      (hl-line-mode 1)))
+
+  (add-hook 'after-change-major-mode-hook #'jorge/hl-line-for-editing-buffers)
+#+end_src
 * Editing basics (Neovim-inspired)
 #+begin_src emacs-lisp
   ;; default to tabs, but let major modes override when needed.
@@ -975,3 +1024,32 @@ i had to install tdlib ~brew install tdlib --head~
 ** forum topic filtering
 we can chat in a group forum type, like our openclaw setup, and filter to send messages in a specific topic by runing ~C-c /~ then selecting topic.
 that's how i'm chatting to the emacs mistah cheeze and it's working well.
+
+* next up!
+** get jj working
+*** prompt
+read through /Users/jorge/obsidian/delvaze/garden/migration-to-emacs.md very carefully
+this is my migration to emacs plan.
+i'm currently using neovim but i'm switching over piece by piece and i'm trying to learn everything from first principles.
+right now, i want to start integration w/ jj for vcs control.
+~/.config/nvim/lua/jorge/jj.lua contains my current neovim vcs stuff.
+i'm looking at potentially using majutsu since i prefer jj. i'm already a bit used to magit so it's familiar.
+review the plan, then give me an overview of how you're going to update my config.
+be sure to keep it straightforward for now. let me know of possible improvements.
+review my keybindings from neovim for vcs stuff and offer analogous ones. for the most part, i require `SPC gs` at a minimum.
+if you have any clarifying questions, comments, concerns, STOP and let me address them for you before you continue.
+** ergonomic pi
+pi mode sucks so far because opening a bunch gets unwieldy w/ having to pop up both the input + the view buffers at the same time.
+i want to open it in a new tab, and have tab nav bindings
+~SPC t~ menu.
+~SPC tn~ next.
+~SPC tp~ prev.
+~SPC tl~ search menu.
+when i run ~SPC ai~, i want it to by default run ~C-u M-x pi~, with a default name (some number, counting the curr session),
+allowing me to rename if i desire.
+when pressing enter, i want it to open in a new tab on its own.
+if i swap to a pi buffer, i want it to also bring along it's buddy the chat view, or the input view, depending on which one i bring.
+it should be the one specific to that session.
+if i can do that then that's better than weird tabs stuff. i prefer single buffer nav.
+https://github.com/nex3/perspective-el
+this perspective thing might give me exactly what i want too.
