@@ -656,34 +656,57 @@ mr cheeze bot has the thread on this
   ;; Formatter orchestration (manual only; no format-on-save).
   (use-package apheleia
     :config
-    (setf (alist-get 'biome apheleia-formatters)
-          '("biome" "format" "--stdin-file-path" filepath))
-    (setf (alist-get 'ruff-format apheleia-formatters)
-          '("ruff" "format" "--stdin-filename" filepath "-"))
+    ;; Prefer Apheleia builtins where available; add only missing ones.
+    ;; Match Neovim conform config for tools Apheleia doesn't ship.
+    (setf (alist-get 'yamlfmt apheleia-formatters)
+          '("yamlfmt" "-")
+          (alist-get 'sqlfmt apheleia-formatters)
+          '("sqlfmt" "-")
+          (alist-get 'djlint apheleia-formatters)
+          '("djlint" "--reformat" "-"))
 
-    ;; Biome-first for JS/TS + Ruff for Python.
+    ;; Biome-first for JS/TS, prettier-markdown for Markdown, Ruff for Python,
+    ;; and parity with Neovim formatter mappings for Lua/YAML/SQL/shell/templates.
     (setf (alist-get 'js-mode apheleia-mode-alist) 'biome
           (alist-get 'js-ts-mode apheleia-mode-alist) 'biome
           (alist-get 'javascript-mode apheleia-mode-alist) 'biome
+          (alist-get 'js-jsx-mode apheleia-mode-alist) 'biome
+          (alist-get 'js2-jsx-mode apheleia-mode-alist) 'biome
+          (alist-get 'rjsx-mode apheleia-mode-alist) 'biome
           (alist-get 'typescript-mode apheleia-mode-alist) 'biome
           (alist-get 'typescript-ts-mode apheleia-mode-alist) 'biome
           (alist-get 'tsx-ts-mode apheleia-mode-alist) 'biome
           (alist-get 'json-mode apheleia-mode-alist) 'biome
           (alist-get 'json-ts-mode apheleia-mode-alist) 'biome
-          (alist-get 'python-mode apheleia-mode-alist) 'ruff-format
-          (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff-format)
+          (alist-get 'jsonc-mode apheleia-mode-alist) 'biome
+          (alist-get 'markdown-mode apheleia-mode-alist) 'prettier-markdown
+          (alist-get 'lua-mode apheleia-mode-alist) 'stylua
+          (alist-get 'lua-ts-mode apheleia-mode-alist) 'stylua
+          (alist-get 'yaml-mode apheleia-mode-alist) 'yamlfmt
+          (alist-get 'yaml-ts-mode apheleia-mode-alist) 'yamlfmt
+          (alist-get 'sql-mode apheleia-mode-alist) 'sqlfmt
+          (alist-get 'sh-mode apheleia-mode-alist) 'shfmt
+          (alist-get 'bash-ts-mode apheleia-mode-alist) 'shfmt
+          (alist-get 'zsh-mode apheleia-mode-alist) 'shfmt
+          (alist-get 'django-mode apheleia-mode-alist) 'djlint
+          (alist-get 'jinja2-mode apheleia-mode-alist) 'djlint
+          (alist-get "\\.jinja\\.html\\'" apheleia-mode-alist) 'djlint
+          (alist-get "\\.djhtml\\'" apheleia-mode-alist) 'djlint
+          (alist-get 'python-mode apheleia-mode-alist) 'ruff
+          (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff)
 
     (defun jorge/format-file ()
       "Format current file manually.
 Prefer Apheleia formatter mappings, fallback to LSP format."
       (interactive)
-      (cond
-       ((alist-get major-mode apheleia-mode-alist)
-        (apheleia-format-buffer))
-       ((bound-and-true-p eglot-managed-mode)
-        (eglot-format-buffer))
-       (t
-        (user-error "No formatter configured for %s" major-mode))))
+      (let ((formatters (apheleia--get-formatters)))
+        (cond
+         (formatters
+          (apheleia-format-buffer formatters))
+         ((bound-and-true-p eglot-managed-mode)
+          (eglot-format-buffer))
+         (t
+          (user-error "No formatter configured for %s" major-mode)))))
 
     (define-key jorge/leader-map (kbd "f f") #'jorge/format-file))
 
