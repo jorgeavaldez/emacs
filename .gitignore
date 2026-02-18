@@ -12,6 +12,8 @@ custom.el
 # Emacs runtime/cache state
 elgrep-data.el
 auto-save-list/
+auto-save/
+backups/
 elpa/
 package-quickstart.el
 tramp

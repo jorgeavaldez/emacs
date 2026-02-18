@@ -168,8 +168,18 @@ once ready, press =x= and poof!
 
   (global-auto-revert-mode 1)
 
-  ;; Keep backup files in a separate directory instead of cluttering your folders
-  (setq backup-directory-alist '(("." . "~/.emacs.d/backups")))
+  ;; Keep repo folders clean:
+  ;; - disable lockfiles (".#file")
+  ;; - send autosaves ("#file#") and backups ("file~") to user-emacs-directory
+  (setq create-lockfiles nil)
+
+  (let ((autosave-dir (expand-file-name "auto-save/" user-emacs-directory))
+        (backup-dir (expand-file-name "backups/" user-emacs-directory)))
+    (make-directory autosave-dir t)
+    (make-directory backup-dir t)
+    (setq auto-save-file-name-transforms `((".*" ,autosave-dir t))
+          auto-save-list-file-prefix (expand-file-name ".saves-" autosave-dir)
+          backup-directory-alist `(("." . ,backup-dir))))
 #+end_src
 
 * Package bootstrap (built-in =package.el= + =use-package=)
@@ -1022,9 +1032,10 @@ This package should give us a more emacs-native use of everything.
       ;; :ensure t
       ;; :init (defalias 'pi 'pi-coding-agent)
 
-  	;; load from my local fork
-  	:ensure nil
-  	:load-path "~/proj/pi-coding-agent"
+      ;; Use my GitHub branch directly via package-vc (instead of local checkout).
+      :vc (:url "https://github.com/jorgeavaldez/pi-coding-agent.git"
+           :branch "feat/rpc/support-editor-resolve-session-changes"
+           :rev :newest)
 
       :custom
       (pi-coding-agent-copy-raw-markdown t)            ; Keep raw markdown on copy (default: strip hidden markup)
