@@ -222,14 +222,30 @@ Note on local files:
 * Ensure env vars are set
 when we start gui emacs, it only inherits a minimal set of env vars.
 unfortunately, this means searching for binaries can fail.
-we can fix that using https://github.com/purcell/exec-path-from-shell
+
+we use three layers:
+- https://github.com/purcell/exec-path-from-shell for startup shell env in gui emacs
+- https://github.com/purcell/inheritenv so temp-buffer commands inherit buffer env
+- https://github.com/eki3z/mise.el for per-project env (mise.toml/.venv) per buffer
+
 #+begin_src emacs-lisp
   (use-package exec-path-from-shell
     :ensure t
     :config
     (when (memq window-system '(mac ns x))
-    (exec-path-from-shell-initialize))
-  )
+      (exec-path-from-shell-initialize)))
+
+  ;; mise.el depends on inheritenv and uses it for process propagation.
+  (use-package inheritenv
+    :defer t)
+
+  (use-package mise
+    :after inheritenv
+    :hook (after-init . global-mise-mode)
+    :config
+    ;; Keep default trust behavior ('ask') for safety.
+    ;; Use M-x mise-reload if you need to force a refresh for current buffer.
+    (setq mise-update-on-eshell-directory-change t))
 #+end_src
 * Basic bindings and key model (Evil + leader + which-key)
 What each package is for:
@@ -638,10 +654,17 @@ This keeps Dired fast for cross-directory file moves/copies.
            (tsx-ts-mode . jorge/eglot-ensure))
     :config
     (let ((py-server (eglot-alternatives
-                      '(("basedpyright-langserver" "--stdio")
+                      ;; Prefer running python LSP servers through mise so
+                      ;; project-local env/venv from mise.toml is applied.
+                      '(("mise" "x" "--" "basedpyright-langserver" "--stdio")
+                        ("mise" "x" "--" "pyright-langserver" "--stdio")
+                        ("basedpyright-langserver" "--stdio")
                         ("pyright-langserver" "--stdio"))))
           (ts-server (eglot-alternatives
-                      '(("typescript-language-server" "--stdio")
+                      ;; Prefer mise-managed tooling; bunx will use local package
+                      ;; binaries when present and otherwise fetch a cached copy.
+                      '(("mise" "x" "--" "bunx" "--bun" "typescript-language-server" "--stdio")
+                        ("typescript-language-server" "--stdio")
                         ("bunx" "--bun" "typescript-language-server" "--stdio")
                         ("npx" "typescript-language-server" "--stdio")))))
       ;; Use setf/alist-get so reloading config doesn't duplicate entries.
@@ -652,7 +675,8 @@ This keeps Dired fast for cross-directory file moves/copies.
                        eglot-server-programs nil nil #'equal)
             ts-server))
 
-    (setq project-vc-extra-root-markers '("package.json" "tsconfig.json"))
+    ;; Keep project root detection at VCS root by default so monorepo search
+    ;; commands (consult-ripgrep/project.el) stay scoped to workspace root.
 
     ;; Keep import organization with Ruff/Biome tooling pipeline.
     (setq-default eglot-workspace-configuration
@@ -689,8 +713,8 @@ This keeps Dired fast for cross-directory file moves/copies.
   (use-package eldoc-box
     :after eglot
     :commands (eldoc-box-help-at-point)
-    :config
-    (define-key jorge/leader-map (kbd "k") #'eldoc-box-help-at-point))
+    :bind (:map jorge/leader-map
+                ("k" . eldoc-box-help-at-point)))
 
   ;; Ruff diagnostics for python buffers (alongside pyright/basedpyright typing).
   (use-package flymake-ruff
@@ -817,13 +841,17 @@ This keeps Dired fast for cross-directory file moves/copies.
 
   (defun jorge/treesit--motion-predicate (kind)
     "Resolve movement predicate for KIND."
-    (cond
-     ;; Prefer mode-provided defun navigation when available.
-     ((and (eq kind 'function) (treesit-thing-defined-p 'defun))
-      'defun)
-     (t
-      (or (alist-get kind jorge/treesit-motion-regex-alist)
-          (user-error "Unknown treesit motion kind: %s" kind)))))
+    (let ((lang (treesit-language-at (point))))
+      (cond
+       ;; Prefer mode-provided defun navigation when available.
+       ;; Emacs 30 expects (treesit-thing-defined-p THING LANGUAGE).
+       ((and (eq kind 'function)
+             lang
+             (treesit-thing-defined-p 'defun lang))
+        'defun)
+       (t
+        (or (alist-get kind jorge/treesit-motion-regex-alist)
+            (user-error "Unknown treesit motion kind: %s" kind))))))
 
   (defun jorge/treesit-goto (kind backward goto-start)
     "Move point using tree-sitter by KIND.
