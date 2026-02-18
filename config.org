@@ -635,6 +635,35 @@ This keeps Dired fast for cross-directory file moves/copies.
       ;; Keep Eglot completion candidates fresh as buffer changes.
       (advice-add 'eglot-completion-at-point :around #'cape-wrap-buster)))
 
+  (defvar jorge/eglot-ts-contact-candidates
+    ;; Prefer mise-managed tooling; bunx will use local package
+    ;; binaries when present and otherwise fetch a cached copy.
+    '(("mise" "x" "--" "bunx" "--bun" "typescript-language-server" "--stdio")
+      ("typescript-language-server" "--stdio")
+      ("bunx" "--bun" "typescript-language-server" "--stdio")
+      ("npx" "typescript-language-server" "--stdio")))
+
+  (defun jorge/eglot-tsserver-path (&optional dir)
+    "Return nearest node_modules tsserver.js path from DIR upward."
+    (let* ((start (or dir default-directory))
+           (root (locate-dominating-file start "node_modules/typescript/lib/tsserver.js")))
+      (when root
+        (expand-file-name "node_modules/typescript/lib/tsserver.js" root))))
+
+  (defun jorge/eglot-ts-contact (interactive _project)
+    "Build TypeScript LSP contact with monorepo-aware tsserver path.
+
+The project root may be a top-level VCS directory in monorepos.  Passing
+`tsserver.path' from the nearest node_modules avoids startup failures."
+    (let* ((contact (funcall (eglot-alternatives jorge/eglot-ts-contact-candidates)
+                             interactive _project))
+           (tsserver-path (jorge/eglot-tsserver-path)))
+      (if (and (listp contact) tsserver-path)
+          (append contact
+                  (list :initializationOptions
+                        `(:tsserver (:path ,tsserver-path))))
+        contact)))
+
   (defun jorge/eglot-ensure ()
     "Start Eglot for current buffer when appropriate."
     (unless (or (minibufferp)
@@ -660,13 +689,7 @@ This keeps Dired fast for cross-directory file moves/copies.
                         ("mise" "x" "--" "pyright-langserver" "--stdio")
                         ("basedpyright-langserver" "--stdio")
                         ("pyright-langserver" "--stdio"))))
-          (ts-server (eglot-alternatives
-                      ;; Prefer mise-managed tooling; bunx will use local package
-                      ;; binaries when present and otherwise fetch a cached copy.
-                      '(("mise" "x" "--" "bunx" "--bun" "typescript-language-server" "--stdio")
-                        ("typescript-language-server" "--stdio")
-                        ("bunx" "--bun" "typescript-language-server" "--stdio")
-                        ("npx" "typescript-language-server" "--stdio")))))
+          (ts-server #'jorge/eglot-ts-contact))
       ;; Use setf/alist-get so reloading config doesn't duplicate entries.
       (setf (alist-get '(python-mode python-ts-mode)
                        eglot-server-programs nil nil #'equal)
@@ -675,8 +698,9 @@ This keeps Dired fast for cross-directory file moves/copies.
                        eglot-server-programs nil nil #'equal)
             ts-server))
 
-    ;; Keep project root detection at VCS root by default so monorepo search
-    ;; commands (consult-ripgrep/project.el) stay scoped to workspace root.
+    ;; Keep VCS-root project behavior by default.
+    ;; JS/TS uses `jorge/eglot-ts-contact' to pass `tsserver.path' from the
+    ;; nearest node_modules so monorepos still initialize correctly.
 
     ;; Keep import organization with Ruff/Biome tooling pipeline.
     (setq-default eglot-workspace-configuration
