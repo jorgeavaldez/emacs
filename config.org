@@ -457,7 +457,7 @@ Why this is useful:
 
   (use-package orderless
     :custom
-    (completion-styles '(basic substring orderless))
+    (completion-styles '(orderless partial-completion basic))
     (completion-category-defaults nil)
     (completion-category-overrides '((file (styles partial-completion))))
     (orderless-matching-styles '(orderless-flex orderless-literal orderless-regexp)))
@@ -1086,7 +1086,7 @@ This package should give us a more emacs-native use of everything.
 
       ;; Use my GitHub branch directly via package-vc (instead of local checkout).
       :vc (:url "https://github.com/jorgeavaldez/pi-coding-agent.git"
-           :branch "feat/rpc/support-editor-resolve-session-changes"
+           :branch "dev"
            :rev :newest)
 
       :custom
@@ -1376,14 +1376,20 @@ mirror your old neovim flow where it matters most.
       (make-directory prompts-dir t)
       (find-file (expand-file-name (concat title ".md") prompts-dir))))
 
+  (defun jorge/obsidian-template-title ()
+    "Return a reasonable template title for the current buffer context."
+    (let ((raw (if (buffer-file-name)
+                   (file-name-base (buffer-file-name))
+                 (buffer-name))))
+      ;; Scratch/special buffers often use *name*; strip wrappers for cleaner titles.
+      (string-trim (replace-regexp-in-string "\\`\\*\\|\\*\\'" "" raw))))
+
   (defun jorge/obsidian-apply-template ()
-    "Apply a template from <vault>/templates to current note."
+    "Insert a template from <vault>/templates at point in the current buffer.
+
+Works in any writable buffer (file-backed or not)."
     (interactive)
-    (require 'obsidian)
-    (unless (buffer-file-name)
-      (user-error "Current buffer is not visiting a file"))
-    (unless (jorge/obsidian-in-vault-p)
-      (user-error "Current file is not inside the Obsidian vault"))
+    (require 'subr-x)
     (let* ((templates-dir (expand-file-name "templates" jorge/obsidian-vault-dir))
            (files (and (file-directory-p templates-dir)
                        (directory-files-recursively templates-dir "\\.md\\'"))))
@@ -1391,11 +1397,20 @@ mirror your old neovim flow where it matters most.
         (user-error "No templates found in %s" templates-dir))
       (let* ((choices (mapcar (lambda (f) (file-relative-name f templates-dir)) files))
              (choice (completing-read "Template: " choices nil t))
-             (template-file (expand-file-name choice templates-dir)))
-        (when (and (> (buffer-size) 0)
-                   (not (y-or-n-p "Current note is not empty. Insert template anyway? ")))
-          (user-error "Template insertion cancelled"))
-        (obsidian-apply-template template-file))))
+             (template-file (expand-file-name choice templates-dir))
+             (template-content (with-temp-buffer
+                                 (insert-file-contents template-file)
+                                 (buffer-string)))
+             (rendered (let ((title (jorge/obsidian-template-title))
+                             (date (format-time-string "%Y-%m-%d"))
+                             (time (format-time-string "%H:%M:%S")))
+                         (setq template-content
+                               (replace-regexp-in-string "{{title}}" title template-content))
+                         (setq template-content
+                               (replace-regexp-in-string "{{date}}" date template-content))
+                         (replace-regexp-in-string "{{time}}" time template-content))))
+        (insert rendered)
+        (message "Inserted template: %s" choice))))
 
   (defun jorge/obsidian-follow-link-at-point-vault-only ()
     "Follow Obsidian link at point only for files inside the vault."
@@ -1447,7 +1462,7 @@ mirror your old neovim flow where it matters most.
       "SPC o f" "quick switch note"
       "SPC o /" "search vault (ripgrep)"
       "SPC o p" "new prompt note"
-      "SPC o t" "apply template"
+      "SPC o t" "insert template at point"
       "SPC RET" "follow obsidian link (vault only)"))
 #+end_src
 
@@ -1569,3 +1584,14 @@ ticket goal:
 - evaluate if winner-mode smooths out the pi split/reset workflow enough to make it default
 - if yes, add minimal config + leader bindings in a later change
 - if no, document why and keep current custom layout helpers only
+
+* wat
+#+begin_src emacs-lisp
+   (advice-add
+    'pi-coding-agent--start-process :before
+    (lambda (dir)
+      (message "[pi-start] %s dir=%s cmd=%S"
+               (format-time-string "%H:%M:%S.%3N")
+               dir
+               (list "pi" "--mode" "rpc" pi-coding-agent-extra-args))))
+#+end_src
