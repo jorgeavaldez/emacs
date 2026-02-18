@@ -10,6 +10,7 @@ config.el
 custom.el
 
 # Emacs runtime/cache state
+elgrep-data.el
 auto-save-list/
 elpa/
 package-quickstart.el

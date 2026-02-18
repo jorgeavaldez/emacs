@@ -919,7 +919,16 @@ For now, keep JJ intentionally small:
       "SPC j" "jujutsu"
       "SPC j j" "jj log (majutsu)"))
 #+end_src
-
+** diff viewing
+ediff is the default diff editor/viewer.
+by default it pops up a weird little window and we have to be in that window to send commands.
+we can change that though.
+#+begin_src emacs-lisp
+  ;; Use a single frame for Ediff instead of a popup control window
+  (setq ediff-window-setup-function 'ediff-setup-windows-plain)
+  ;; Split windows horizontally (side-by-side) instead of vertically
+  (setq ediff-split-window-function 'split-window-horizontally)
+#+end_src
 * UI defaults
 ** font
 #+begin_src emacs-lisp
@@ -1009,264 +1018,374 @@ I integrated my neovim into pi very heavily.
 This package should give us a more emacs-native use of everything.
 
 #+begin_src emacs-lisp
-  (use-package pi-coding-agent
-    :ensure t
-    :init (defalias 'pi 'pi-coding-agent)
-    :custom
-    (pi-coding-agent-copy-raw-markdown t)            ; Keep raw markdown on copy (default: strip hidden markup)
-    (pi-coding-agent-input-markdown-highlighting t)) ; GFM syntax highlighting in input buffer
+    (use-package pi-coding-agent
+      ;; :ensure t
+      ;; :init (defalias 'pi 'pi-coding-agent)
 
-  (defun jorge/pi--chat-buffer-p (buffer)
-    "Return non-nil if BUFFER is a live pi chat buffer."
-    (and (buffer-live-p buffer)
-         (with-current-buffer buffer
-           (derived-mode-p 'pi-coding-agent-chat-mode))))
+  	;; load from my local fork
+  	:ensure nil
+  	:load-path "~/proj/pi-coding-agent"
 
-  (defun jorge/pi--session-buffer-p (buffer)
-    "Return non-nil if BUFFER is a live pi chat/input buffer."
-    (and (buffer-live-p buffer)
-         (with-current-buffer buffer
-           (derived-mode-p 'pi-coding-agent-chat-mode 'pi-coding-agent-input-mode))))
+      :custom
+      (pi-coding-agent-copy-raw-markdown t)            ; Keep raw markdown on copy (default: strip hidden markup)
+      (pi-coding-agent-input-markdown-highlighting t)) ; GFM syntax highlighting in input buffer
 
-  (defun jorge/pi--session-input-buffer (chat-buf)
-    "Return input buffer paired with CHAT-BUF, or nil."
-    (when (jorge/pi--chat-buffer-p chat-buf)
-      (let ((input-buf (buffer-local-value 'pi-coding-agent--input-buffer chat-buf)))
-        (when (buffer-live-p input-buf)
-          input-buf))))
+    (defun jorge/pi--chat-buffer-p (buffer)
+      "Return non-nil if BUFFER is a live pi chat buffer."
+      (and (buffer-live-p buffer)
+           (with-current-buffer buffer
+             (derived-mode-p 'pi-coding-agent-chat-mode))))
 
-  (defun jorge/pi--session-buffers (&optional buffer)
-    "Return (CHAT INPUT) for BUFFER's session, or nil if BUFFER is not a pi buffer."
-    (let ((buf (or buffer (current-buffer))))
-      (when (jorge/pi--session-buffer-p buf)
-        (with-current-buffer buf
-          (let* ((chat (if (derived-mode-p 'pi-coding-agent-chat-mode)
-                           (current-buffer)
-                         pi-coding-agent--chat-buffer))
-                 (input (if (derived-mode-p 'pi-coding-agent-input-mode)
-                            (current-buffer)
-                          pi-coding-agent--input-buffer)))
-            (when (and (buffer-live-p chat) (buffer-live-p input))
-              (list chat input)))))))
+    (defun jorge/pi--session-buffer-p (buffer)
+      "Return non-nil if BUFFER is a live pi chat/input buffer."
+      (and (buffer-live-p buffer)
+           (with-current-buffer buffer
+             (derived-mode-p 'pi-coding-agent-chat-mode 'pi-coding-agent-input-mode))))
 
-  (defun jorge/pi--live-session-count ()
-    "Return count of live pi chat session buffers."
-    (length (jorge/pi--live-chat-sessions)))
+    (defun jorge/pi--session-input-buffer (chat-buf)
+      "Return input buffer paired with CHAT-BUF, or nil."
+      (when (jorge/pi--chat-buffer-p chat-buf)
+        (let ((input-buf (buffer-local-value 'pi-coding-agent--input-buffer chat-buf)))
+          (when (buffer-live-p input-buf)
+            input-buf))))
 
-  (defun jorge/pi--live-chat-sessions ()
-    "Return all live pi chat session buffers in buffer-list order."
-    (let (sessions)
-      (dolist (buf (buffer-list))
-        (when (jorge/pi--chat-buffer-p buf)
-          (push buf sessions)))
-      (nreverse sessions)))
+    (defun jorge/pi--session-buffers (&optional buffer)
+      "Return (CHAT INPUT) for BUFFER's session, or nil if BUFFER is not a pi buffer."
+      (let ((buf (or buffer (current-buffer))))
+        (when (jorge/pi--session-buffer-p buf)
+          (with-current-buffer buf
+            (let* ((chat (if (derived-mode-p 'pi-coding-agent-chat-mode)
+                             (current-buffer)
+                           pi-coding-agent--chat-buffer))
+                   (input (if (derived-mode-p 'pi-coding-agent-input-mode)
+                              (current-buffer)
+                            pi-coding-agent--input-buffer)))
+              (when (and (buffer-live-p chat) (buffer-live-p input))
+                (list chat input)))))))
 
-  (defun jorge/pi--visible-chat-sessions ()
-    "Return unique live pi chat buffers currently visible in this frame."
-    (let (sessions)
-      (dolist (win (window-list nil 'no-minibuffer))
-        (let* ((buf (window-buffer win))
-               (chat (cond
-                      ((jorge/pi--chat-buffer-p buf) buf)
-                      ((jorge/pi--session-buffer-p buf)
-                       (with-current-buffer buf
-                         pi-coding-agent--chat-buffer)))))
-          (when (and (buffer-live-p chat)
-                     (not (memq chat sessions)))
-            (push chat sessions))))
-      (nreverse sessions)))
+    (defun jorge/pi--live-session-count ()
+      "Return count of live pi chat session buffers."
+      (length (jorge/pi--live-chat-sessions)))
 
-  (defun jorge/pi--selected-non-pi-buffer ()
-    "Return selected window's buffer when it is non-pi, else nil."
-    (let ((buf (window-buffer (selected-window))))
-      (when (and (buffer-live-p buf)
-                 (not (jorge/pi--session-buffer-p buf)))
-        buf)))
+    (defun jorge/pi--live-chat-sessions ()
+      "Return all live pi chat session buffers in buffer-list order."
+      (let (sessions)
+        (dolist (buf (buffer-list))
+          (when (jorge/pi--chat-buffer-p buf)
+            (push buf sessions)))
+        (nreverse sessions)))
 
-  (defun jorge/pi--first-visible-non-pi-buffer ()
-    "Return first visible non-pi buffer in current frame, or nil."
-    (let (result)
-      (dolist (win (window-list nil 'no-minibuffer))
-        (let ((buf (window-buffer win)))
-          (when (and (not result)
-                     (buffer-live-p buf)
-                     (not (jorge/pi--session-buffer-p buf)))
-            (setq result buf))))
-      result))
+    (defun jorge/pi--visible-chat-sessions ()
+      "Return unique live pi chat buffers currently visible in this frame."
+      (let (sessions)
+        (dolist (win (window-list nil 'no-minibuffer))
+          (let* ((buf (window-buffer win))
+                 (chat (cond
+                        ((jorge/pi--chat-buffer-p buf) buf)
+                        ((jorge/pi--session-buffer-p buf)
+                         (with-current-buffer buf
+                           pi-coding-agent--chat-buffer)))))
+            (when (and (buffer-live-p chat)
+                       (not (memq chat sessions)))
+              (push chat sessions))))
+        (nreverse sessions)))
 
-  (defun jorge/pi--display-session-default (chat-buf input-buf target-window)
-    "Display CHAT-BUF and INPUT-BUF in TARGET-WINDOW with pi's default layout."
-    (select-window target-window)
-    ;; Reuse pi's own display helper so input height stays package-default.
-    (pi-coding-agent--display-buffers chat-buf input-buf)
-    ;; Keep focus in input (same as normal sending flow).
-    (let ((input-win (get-buffer-window input-buf)))
-      (when (window-live-p input-win)
-        (select-window input-win))))
+    (defun jorge/pi--selected-non-pi-buffer ()
+      "Return selected window's buffer when it is non-pi, else nil."
+      (let ((buf (window-buffer (selected-window))))
+        (when (and (buffer-live-p buf)
+                   (not (jorge/pi--session-buffer-p buf)))
+          buf)))
 
-  (defun jorge/pi--reset-session-fullframe (chat-buf input-buf)
-    "Reset CHAT-BUF/INPUT-BUF to a fresh full-frame pi layout."
-    (delete-other-windows)
-    (jorge/pi--display-session-default chat-buf input-buf (selected-window)))
+    (defun jorge/pi--first-visible-non-pi-buffer ()
+      "Return first visible non-pi buffer in current frame, or nil."
+      (let (result)
+        (dolist (win (window-list nil 'no-minibuffer))
+          (let ((buf (window-buffer win)))
+            (when (and (not result)
+                       (buffer-live-p buf)
+                       (not (jorge/pi--session-buffer-p buf)))
+              (setq result buf))))
+        result))
 
-  (defun jorge/pi--focus-input (input-buf)
-    "Focus INPUT-BUF if it is visible in a live window."
-    (let ((win (get-buffer-window input-buf)))
-      (when (window-live-p win)
-        (select-window win))))
+    (defun jorge/pi--display-session-default (chat-buf input-buf target-window)
+      "Display CHAT-BUF and INPUT-BUF in TARGET-WINDOW with pi's default layout."
+      (select-window target-window)
+      ;; Reuse pi's own display helper so input height stays package-default.
+      (pi-coding-agent--display-buffers chat-buf input-buf)
+      ;; Keep focus in input (same as normal sending flow).
+      (let ((input-win (get-buffer-window input-buf)))
+        (when (window-live-p input-win)
+          (select-window input-win))))
 
-  (defun jorge/pi--first-visible-other-session (target-chat)
-    "Return (CHAT INPUT) for first visible session that is not TARGET-CHAT."
-    (let (found)
-      (dolist (chat (jorge/pi--visible-chat-sessions))
-        (let ((input (jorge/pi--session-input-buffer chat)))
-          (when (and (not found)
-                     (buffer-live-p input)
-                     (not (eq chat target-chat)))
-            (setq found (list chat input)))))
-      found))
+    (defun jorge/pi--reset-session-fullframe (chat-buf input-buf)
+      "Reset CHAT-BUF/INPUT-BUF to a fresh full-frame pi layout."
+      (delete-other-windows)
+      (jorge/pi--display-session-default chat-buf input-buf (selected-window)))
 
-  (defun jorge/pi--layout-buffer-and-session (context-buffer chat-buf input-buf &optional session-in-first-window)
-    "Create a 50/50 side split with CONTEXT-BUFFER and pi CHAT-BUF/INPUT-BUF.
-When SESSION-IN-FIRST-WINDOW is non-nil, keep session in the selected
-window's half and show CONTEXT-BUFFER in the newly split half."
-    (delete-other-windows)
-    (let ((first-win (selected-window))
-          (second-win (split-window-right)))
-      (if session-in-first-window
-          (progn
-            (jorge/pi--display-session-default chat-buf input-buf first-win)
-            (set-window-buffer second-win context-buffer))
-        (set-window-buffer first-win context-buffer)
-        (jorge/pi--display-session-default chat-buf input-buf second-win))))
+    (defun jorge/pi--focus-input (input-buf)
+      "Focus INPUT-BUF if it is visible in a live window."
+      (let ((win (get-buffer-window input-buf)))
+        (when (window-live-p win)
+          (select-window win))))
 
-  (defun jorge/pi--layout-two-sessions (chat-a input-a chat-b input-b &optional session-a-in-first-window)
-    "Create a 50/50 side split with two pi sessions.
-When SESSION-A-IN-FIRST-WINDOW is non-nil, keep CHAT-A/INPUT-A in the
-selected window's half and show CHAT-B/INPUT-B in the new half."
-    (delete-other-windows)
-    (let ((first-win (selected-window))
-          (second-win (split-window-right)))
-      (if session-a-in-first-window
-          (progn
-            (jorge/pi--display-session-default chat-a input-a first-win)
-            (jorge/pi--display-session-default chat-b input-b second-win))
-        (jorge/pi--display-session-default chat-b input-b first-win)
-        (jorge/pi--display-session-default chat-a input-a second-win))))
+    (defun jorge/pi--first-visible-other-session (target-chat)
+      "Return (CHAT INPUT) for first visible session that is not TARGET-CHAT."
+      (let (found)
+        (dolist (chat (jorge/pi--visible-chat-sessions))
+          (let ((input (jorge/pi--session-input-buffer chat)))
+            (when (and (not found)
+                       (buffer-live-p input)
+                       (not (eq chat target-chat)))
+              (setq found (list chat input)))))
+        found))
 
-  (defun jorge/pi--session-candidate (chat-buf)
-    "Return completion candidate pair (DISPLAY . CHAT-BUF) for CHAT-BUF."
-    (let ((buf-name (buffer-name chat-buf))
-          session-name)
-      (with-current-buffer chat-buf
-        (setq session-name (and (boundp 'pi-coding-agent--session-name)
-                                pi-coding-agent--session-name)))
-      (cons (if (and session-name (not (string-empty-p session-name)))
-                (format "%s  [%s]" session-name buf-name)
-              buf-name)
-            chat-buf)))
-
-  (defun jorge/pi ()
-    "Start a named pi session in a user-selected directory.
-Defaults session name to \"session-N\" based on live pi sessions.
-Prompts for directory, defaulting to project root via `jorge/default-dir',
-falling back to `default-directory'."
-    (interactive)
-    (require 'pi-coding-agent)
-    (let* ((default-name (format "session-%d" (1+ (jorge/pi--live-session-count))))
-           (session-name (read-string "Pi session name: " default-name nil default-name))
-           (dir (file-name-as-directory
-                 (expand-file-name
-                  (read-directory-name "Pi directory: " (jorge/default-dir) nil t))))
-           chat-buf
-           input-buf)
-      (pi-coding-agent--check-dependencies)
-      (setq chat-buf (pi-coding-agent--setup-session dir session-name))
-      (setq input-buf (buffer-local-value 'pi-coding-agent--input-buffer chat-buf))
-      (pi-coding-agent--display-buffers chat-buf input-buf)))
-
-  (defun jorge/pi-summon-paired-buffer ()
-    "Summon/reset current pi pair.
-Only meaningful from pi chat/input buffers.
-If a non-pi buffer is visible, split 50/50 and keep the current pi
-session in one half while putting that non-pi buffer in the other.
-Otherwise reset pi to fresh full-frame layout."
-    (interactive)
-    (require 'pi-coding-agent)
-    (let* ((session (jorge/pi--session-buffers))
-           (chat-buf (car session))
-           (input-buf (cadr session)))
-      (unless (and (buffer-live-p chat-buf) (buffer-live-p input-buf))
-        (user-error "SPC a b is only available in pi chat/input buffers"))
-      (let ((context-buf (or (jorge/pi--selected-non-pi-buffer)
-                             (jorge/pi--first-visible-non-pi-buffer))))
-        (if (buffer-live-p context-buf)
+    (defun jorge/pi--layout-buffer-and-session (context-buffer chat-buf input-buf &optional session-in-first-window)
+      "Create a 50/50 side split with CONTEXT-BUFFER and pi CHAT-BUF/INPUT-BUF.
+  When SESSION-IN-FIRST-WINDOW is non-nil, keep session in the selected
+  window's half and show CONTEXT-BUFFER in the newly split half."
+      (delete-other-windows)
+      (let ((first-win (selected-window))
+            (second-win (split-window-right)))
+        (if session-in-first-window
             (progn
-              (jorge/pi--layout-buffer-and-session context-buf chat-buf input-buf t)
-              (jorge/pi--focus-input input-buf))
-          (jorge/pi--reset-session-fullframe chat-buf input-buf)))))
+              (jorge/pi--display-session-default chat-buf input-buf first-win)
+              (set-window-buffer second-win context-buffer))
+          (set-window-buffer first-win context-buffer)
+          (jorge/pi--display-session-default chat-buf input-buf second-win))))
 
-  (defun jorge/pi-switch-live-session ()
-    "Switch between live Emacs pi sessions (chat buffers only).
-Uses existing minibuffer stack (vertico/orderless/marginalia).
-Selecting current session from a pi buffer performs a full-frame reset;
-other selections build a 50/50 side layout with sensible context."
+    (defun jorge/pi--layout-two-sessions (chat-a input-a chat-b input-b &optional session-a-in-first-window)
+      "Create a 50/50 side split with two pi sessions.
+  When SESSION-A-IN-FIRST-WINDOW is non-nil, keep CHAT-A/INPUT-A in the
+  selected window's half and show CHAT-B/INPUT-B in the new half."
+      (delete-other-windows)
+      (let ((first-win (selected-window))
+            (second-win (split-window-right)))
+        (if session-a-in-first-window
+            (progn
+              (jorge/pi--display-session-default chat-a input-a first-win)
+              (jorge/pi--display-session-default chat-b input-b second-win))
+          (jorge/pi--display-session-default chat-b input-b first-win)
+          (jorge/pi--display-session-default chat-a input-a second-win))))
+
+    (defun jorge/pi--session-candidate (chat-buf)
+      "Return completion candidate pair (DISPLAY . CHAT-BUF) for CHAT-BUF."
+      (let ((buf-name (buffer-name chat-buf))
+            session-name)
+        (with-current-buffer chat-buf
+          (setq session-name (and (boundp 'pi-coding-agent--session-name)
+                                  pi-coding-agent--session-name)))
+        (cons (if (and session-name (not (string-empty-p session-name)))
+                  (format "%s  [%s]" session-name buf-name)
+                buf-name)
+              chat-buf)))
+
+    (defun jorge/pi ()
+      "Start a named pi session in a user-selected directory.
+  Defaults session name to \"session-N\" based on live pi sessions.
+  Prompts for directory, defaulting to project root via `jorge/default-dir',
+  falling back to `default-directory'."
+      (interactive)
+      (require 'pi-coding-agent)
+      (let* ((default-name (format "session-%d" (1+ (jorge/pi--live-session-count))))
+             (session-name (read-string "Pi session name: " default-name nil default-name))
+             (dir (file-name-as-directory
+                   (expand-file-name
+                    (read-directory-name "Pi directory: " (jorge/default-dir) nil t))))
+             chat-buf
+             input-buf)
+        (pi-coding-agent--check-dependencies)
+        (setq chat-buf (pi-coding-agent--setup-session dir session-name))
+        (setq input-buf (buffer-local-value 'pi-coding-agent--input-buffer chat-buf))
+        (pi-coding-agent--display-buffers chat-buf input-buf)))
+
+    (defun jorge/pi-summon-paired-buffer ()
+      "Summon/reset current pi pair.
+  Only meaningful from pi chat/input buffers.
+  If a non-pi buffer is visible, split 50/50 and keep the current pi
+  session in one half while putting that non-pi buffer in the other.
+  Otherwise reset pi to fresh full-frame layout."
+      (interactive)
+      (require 'pi-coding-agent)
+      (let* ((session (jorge/pi--session-buffers))
+             (chat-buf (car session))
+             (input-buf (cadr session)))
+        (unless (and (buffer-live-p chat-buf) (buffer-live-p input-buf))
+          (user-error "SPC a b is only available in pi chat/input buffers"))
+        (let ((context-buf (or (jorge/pi--selected-non-pi-buffer)
+                               (jorge/pi--first-visible-non-pi-buffer))))
+          (if (buffer-live-p context-buf)
+              (progn
+                (jorge/pi--layout-buffer-and-session context-buf chat-buf input-buf t)
+                (jorge/pi--focus-input input-buf))
+            (jorge/pi--reset-session-fullframe chat-buf input-buf)))))
+
+    (defun jorge/pi-switch-live-session ()
+      "Switch between live Emacs pi sessions (chat buffers only).
+  Uses existing minibuffer stack (vertico/orderless/marginalia).
+  Selecting current session from a pi buffer performs a full-frame reset;
+  other selections build a 50/50 side layout with sensible context."
+      (interactive)
+      (require 'pi-coding-agent)
+      (let ((sessions (jorge/pi--live-chat-sessions)))
+        (if (null sessions)
+            (user-error "No live pi sessions")
+          (let* ((choices (mapcar #'jorge/pi--session-candidate sessions))
+                 (selection (completing-read "Pi live session: "
+                                             (mapcar #'car choices)
+                                             nil t))
+                 (target-chat (cdr (assoc selection choices)))
+                 (target-input (and (buffer-live-p target-chat)
+                                    (jorge/pi--session-input-buffer target-chat)))
+                 (current-session (jorge/pi--session-buffers))
+                 (current-chat (car current-session))
+                 (current-input (and (buffer-live-p current-chat)
+                                     (jorge/pi--session-input-buffer current-chat)))
+                 (visible-other (jorge/pi--first-visible-other-session target-chat))
+                 (context-buf (or (jorge/pi--selected-non-pi-buffer)
+                                  (jorge/pi--first-visible-non-pi-buffer))))
+            (unless (and (buffer-live-p target-chat) (buffer-live-p target-input))
+              (user-error "Selected pi session is no longer live"))
+            (cond
+             ((and (buffer-live-p current-chat)
+                   (eq current-chat target-chat))
+              (jorge/pi--reset-session-fullframe target-chat target-input))
+             ((and (buffer-live-p current-chat)
+                   (buffer-live-p current-input))
+              (jorge/pi--layout-two-sessions
+               current-chat current-input
+               target-chat target-input
+               t)
+              (jorge/pi--focus-input target-input))
+             ((and (consp visible-other)
+                   (buffer-live-p (car visible-other))
+                   (buffer-live-p (cadr visible-other)))
+              (jorge/pi--layout-two-sessions
+               (car visible-other) (cadr visible-other)
+               target-chat target-input
+               t)
+              (jorge/pi--focus-input target-input))
+             ((buffer-live-p context-buf)
+              (jorge/pi--layout-buffer-and-session context-buf target-chat target-input nil)
+              (jorge/pi--focus-input target-input))
+             (t
+              (jorge/pi--reset-session-fullframe target-chat target-input)))))))
+
+    (define-key jorge/leader-map (kbd "a i") #'jorge/pi)
+    (define-key jorge/leader-map (kbd "a b") #'jorge/pi-summon-paired-buffer)
+    (define-key jorge/leader-map (kbd "a s") #'jorge/pi-switch-live-session)
+
+    (with-eval-after-load 'which-key
+      (which-key-add-key-based-replacements
+        "SPC a" "ai"
+        "SPC a i" "start named pi session"
+        "SPC a b" "summon/reset pi pair"
+        "SPC a s" "switch live pi session"))
+#+end_src
+
+* Notes / Obsidian (obsidian.el)
+keep this intentionally small and binding-first.
+mirror your old neovim flow where it matters most.
+#+begin_src emacs-lisp
+  (defconst jorge/obsidian-vault-dir (expand-file-name "~/obsidian/delvaze")
+    "Absolute path to your Obsidian vault.")
+
+  (defun jorge/obsidian-in-vault-p (&optional file)
+    "Return non-nil when FILE (or current buffer file) lives in the Obsidian vault."
+    (let* ((target (or file (buffer-file-name)))
+           (vault (file-name-as-directory (expand-file-name jorge/obsidian-vault-dir))))
+      (and target
+           (string-prefix-p vault (expand-file-name target)))))
+
+  (defun jorge/obsidian-consult-ripgrep-vault ()
+    "Search Obsidian vault with Consult ripgrep."
     (interactive)
-    (require 'pi-coding-agent)
-    (let ((sessions (jorge/pi--live-chat-sessions)))
-      (if (null sessions)
-          (user-error "No live pi sessions")
-        (let* ((choices (mapcar #'jorge/pi--session-candidate sessions))
-               (selection (completing-read "Pi live session: "
-                                           (mapcar #'car choices)
-                                           nil t))
-               (target-chat (cdr (assoc selection choices)))
-               (target-input (and (buffer-live-p target-chat)
-                                  (jorge/pi--session-input-buffer target-chat)))
-               (current-session (jorge/pi--session-buffers))
-               (current-chat (car current-session))
-               (current-input (and (buffer-live-p current-chat)
-                                   (jorge/pi--session-input-buffer current-chat)))
-               (visible-other (jorge/pi--first-visible-other-session target-chat))
-               (context-buf (or (jorge/pi--selected-non-pi-buffer)
-                                (jorge/pi--first-visible-non-pi-buffer))))
-          (unless (and (buffer-live-p target-chat) (buffer-live-p target-input))
-            (user-error "Selected pi session is no longer live"))
-          (cond
-           ((and (buffer-live-p current-chat)
-                 (eq current-chat target-chat))
-            (jorge/pi--reset-session-fullframe target-chat target-input))
-           ((and (buffer-live-p current-chat)
-                 (buffer-live-p current-input))
-            (jorge/pi--layout-two-sessions
-             current-chat current-input
-             target-chat target-input
-             t)
-            (jorge/pi--focus-input target-input))
-           ((and (consp visible-other)
-                 (buffer-live-p (car visible-other))
-                 (buffer-live-p (cadr visible-other)))
-            (jorge/pi--layout-two-sessions
-             (car visible-other) (cadr visible-other)
-             target-chat target-input
-             t)
-            (jorge/pi--focus-input target-input))
-           ((buffer-live-p context-buf)
-            (jorge/pi--layout-buffer-and-session context-buf target-chat target-input nil)
-            (jorge/pi--focus-input target-input))
-           (t
-            (jorge/pi--reset-session-fullframe target-chat target-input)))))))
+    (consult-ripgrep jorge/obsidian-vault-dir))
 
-  (define-key jorge/leader-map (kbd "a i") #'jorge/pi)
-  (define-key jorge/leader-map (kbd "a b") #'jorge/pi-summon-paired-buffer)
-  (define-key jorge/leader-map (kbd "a s") #'jorge/pi-switch-live-session)
+  (defun jorge/obsidian-new-prompt-note ()
+    "Create/open a prompt note under <vault>/prompts."
+    (interactive)
+    (require 'subr-x)
+    (let* ((title (string-trim (read-string "Prompt note title: ")))
+           (prompts-dir (expand-file-name "prompts" jorge/obsidian-vault-dir)))
+      (when (string-empty-p title)
+        (user-error "Prompt note title cannot be empty"))
+      (make-directory prompts-dir t)
+      (find-file (expand-file-name (concat title ".md") prompts-dir))))
+
+  (defun jorge/obsidian-apply-template ()
+    "Apply a template from <vault>/templates to current note."
+    (interactive)
+    (require 'obsidian)
+    (unless (buffer-file-name)
+      (user-error "Current buffer is not visiting a file"))
+    (unless (jorge/obsidian-in-vault-p)
+      (user-error "Current file is not inside the Obsidian vault"))
+    (let* ((templates-dir (expand-file-name "templates" jorge/obsidian-vault-dir))
+           (files (and (file-directory-p templates-dir)
+                       (directory-files-recursively templates-dir "\\.md\\'"))))
+      (unless files
+        (user-error "No templates found in %s" templates-dir))
+      (let* ((choices (mapcar (lambda (f) (file-relative-name f templates-dir)) files))
+             (choice (completing-read "Template: " choices nil t))
+             (template-file (expand-file-name choice templates-dir)))
+        (when (and (> (buffer-size) 0)
+                   (not (y-or-n-p "Current note is not empty. Insert template anyway? ")))
+          (user-error "Template insertion cancelled"))
+        (obsidian-apply-template template-file))))
+
+  (defun jorge/obsidian-follow-link-at-point-vault-only ()
+    "Follow Obsidian link at point only for files inside the vault."
+    (interactive)
+    (if (jorge/obsidian-in-vault-p)
+        (progn
+          (require 'obsidian)
+          (obsidian-follow-link-at-point))
+      (message "Not in Obsidian vault; no follow-link action")))
+
+  ;; Vendored locally from https://github.com/knu/obsidian-pcache.el
+  ;; (not installed as a package) so we can review/track the exact source.
+  (use-package pcache
+    :ensure t)
+
+  (use-package obsidian-pcache
+    :ensure nil
+    :demand t
+    :load-path (lambda () (list (expand-file-name "lisp" user-emacs-directory))))
+
+  (use-package obsidian
+    :demand t
+    :init
+    ;; matching your high-value old mappings only.
+    (define-key jorge/leader-map (kbd "o n") #'obsidian-capture)
+    (define-key jorge/leader-map (kbd "o d") #'obsidian-daily-note)
+    (define-key jorge/leader-map (kbd "o f") #'obsidian-jump)
+    (define-key jorge/leader-map (kbd "o /") #'jorge/obsidian-consult-ripgrep-vault)
+    (define-key jorge/leader-map (kbd "o p") #'jorge/obsidian-new-prompt-note)
+    (define-key jorge/leader-map (kbd "o t") #'jorge/obsidian-apply-template)
+
+    ;; keep SPC RET predictable: only obsidian behavior in vault files.
+    (define-key jorge/leader-map (kbd "RET") #'jorge/obsidian-follow-link-at-point-vault-only)
+    :custom
+    (obsidian-directory jorge/obsidian-vault-dir)
+    (obsidian-inbox-directory "inbox")
+    (obsidian-daily-notes-directory "daily")
+    (obsidian-templates-directory "templates")
+    ;; keep wiki links recognized for follow-link behavior.
+    (markdown-enable-wiki-links t)
+    :config
+    (global-obsidian-mode 1))
 
   (with-eval-after-load 'which-key
     (which-key-add-key-based-replacements
-      "SPC a" "ai"
-      "SPC a i" "start named pi session"
-      "SPC a b" "summon/reset pi pair"
-      "SPC a s" "switch live pi session"))
+      "SPC o" "obsidian"
+      "SPC o n" "new note (inbox)"
+      "SPC o d" "daily note"
+      "SPC o f" "quick switch note"
+      "SPC o /" "search vault (ripgrep)"
+      "SPC o p" "new prompt note"
+      "SPC o t" "apply template"
+      "SPC RET" "follow obsidian link (vault only)"))
 #+end_src
 
 * Markdown
